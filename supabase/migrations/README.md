@@ -9,6 +9,7 @@ Supabase SQL Editor で次の順に実行してください。
 1. `migrations/001_initial_schema.sql`
 2. `migrations/002_seed_master_data.sql`
 3. `migrations/003_rls_policies.sql`
+4. `migrations/004_public_master_data_read_policies.sql`
 
 既存の本番データベースへそのまま流す用途ではなく、初期構築用です。実行前に対象プロジェクトが正しいことを確認してください。
 
@@ -75,6 +76,13 @@ select public.accept_message_request('<message_request_uuid>');
 - 凍結・退会ユーザー、凍結・退会グループは検索公開から除外します。
 - `admin_users` は別の `auth.users` アカウントで管理します。最初の運営アカウントはSQL Editorから登録し、以降は運営画面または安全なバックエンド経由で追加してください。
 - `subscriptions` と `payment_history` はPhase 2の器です。ユーザーは自分の履歴を読むだけで、Stripe Webhook等の信頼できるサーバー側処理が書き込みます。
+
+## ログイン前のマスターデータ読み取り
+
+`004_public_master_data_read_policies.sql` は、RLSを有効に保ったまま
+`parts`、`genres`、`areas` の有効な行だけを `anon` と `authenticated` に公開します。
+書き込み権限は追加しません。ユーザー、メッセージ、レビュー、通報、ブロック、課金関連などの
+ユーザー生成・非公開テーブルのポリシーは変更しません。
 
 ユーザー自身の退会は次のRPCを使います。
 
