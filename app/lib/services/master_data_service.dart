@@ -4,7 +4,7 @@ import '../models/master_data_item.dart';
 
 class MasterDataService {
   MasterDataService({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
 
@@ -20,11 +20,17 @@ class MasterDataService {
           .select('id, code, name, sort_order')
           .eq('is_active', true)
           .order('sort_order'),
+      _client
+          .from('areas')
+          .select('id, code, name, level, sort_order')
+          .eq('is_active', true)
+          .order('sort_order'),
     ]);
 
     return MasterData(
       parts: _toItems(responses[0]),
       genres: _toItems(responses[1]),
+      areas: _toItems(responses[2]),
     );
   }
 

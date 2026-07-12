@@ -41,7 +41,9 @@ class MasterDataSection extends StatelessWidget {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: items.map((item) => Chip(label: Text(item.name))).toList(),
+              children: items
+                  .map((item) => Chip(label: Text(item.name)))
+                  .toList(),
             ),
           ],
         ),
