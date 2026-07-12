@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({super.key, this.initialMessage});
+
+  final String? initialMessage;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -12,6 +14,12 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   bool _isSending = false;
   String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _message = widget.initialMessage;
+  }
 
   @override
   void dispose() {

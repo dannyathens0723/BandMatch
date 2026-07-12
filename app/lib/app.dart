@@ -7,6 +7,7 @@ import 'config/app_config.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_setup_screen.dart';
+import 'services/auth_callback.dart';
 import 'services/profile_service.dart';
 import 'theme/app_theme.dart';
 
@@ -39,15 +40,47 @@ class _AuthGateState extends State<AuthGate> {
   _GateState _state = _GateState.loading;
   User? _user;
   String? _error;
+  String? _authMessage;
   int _requestId = 0;
 
   @override
   void initState() {
     super.initState();
+    _handleInitialCallbackUrl();
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
       (_) => _resolveCurrentUser(),
+      onError: _handleAuthStreamError,
     );
     _resolveCurrentUser();
+  }
+
+  void _handleInitialCallbackUrl() {
+    // Supabase.initialize has already processed a valid Web callback. Read the
+    // session before changing the address bar so a valid session is never lost.
+    final session = Supabase.instance.client.auth.currentSession;
+    final callback = AuthCallbackInfo.fromUri(Uri.base);
+    if (!callback.hasAuthParameters) return;
+
+    if (session == null) {
+      _authMessage = callback.authErrorMessage;
+    }
+    cleanAuthCallbackUrl(Uri.base);
+  }
+
+  void _handleAuthStreamError(Object error) {
+    if (!mounted) return;
+    if (Supabase.instance.client.auth.currentSession == null) {
+      setState(() {
+        _user = null;
+        _authMessage = '認証状態を確認できませんでした。もう一度サインインしてください。';
+        _state = _GateState.auth;
+      });
+      return;
+    }
+    setState(() {
+      _error = '$error';
+      _state = _GateState.error;
+    });
   }
 
   @override
@@ -58,16 +91,26 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _resolveCurrentUser() async {
     final requestId = ++_requestId;
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) {
-      if (mounted) setState(() => _state = _GateState.auth);
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      if (mounted) {
+        setState(() {
+          _user = null;
+          _error = null;
+          _state = _GateState.auth;
+        });
+      }
       return;
     }
+    final user = session.user;
 
-    setState(() {
-      _state = _GateState.loading;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _state = _GateState.loading;
+        _error = null;
+        _authMessage = null;
+      });
+    }
     try {
       final profile = await _profileService.fetchCurrentProfile(user.id);
       if (!mounted || requestId != _requestId) return;
@@ -87,7 +130,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     return switch (_state) {
-      _GateState.auth => const AuthScreen(),
+      _GateState.auth => AuthScreen(initialMessage: _authMessage),
       _GateState.profileSetup => ProfileSetupScreen(
         authUser: _user!,
         onSaved: _resolveCurrentUser,

@@ -15,6 +15,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final MasterDataService _masterDataService = MasterDataService();
   late Future<MasterData> _masterData;
+  bool _isSigningOut = false;
 
   @override
   void initState() {
@@ -24,6 +25,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _reload() =>
       setState(() => _masterData = _masterDataService.fetchActiveMasterData());
+
+  Future<void> _signOut() async {
+    setState(() => _isSigningOut = true);
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } on AuthException {
+      // A network failure must not leave a usable local session behind.
+      await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+    } finally {
+      if (mounted) setState(() => _isSigningOut = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +51,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             tooltip: 'サインアウト',
-            onPressed: () => Supabase.instance.client.auth.signOut(),
-            icon: const Icon(Icons.logout),
+            onPressed: _isSigningOut ? null : _signOut,
+            icon: _isSigningOut
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout),
           ),
           const SizedBox(width: 12),
         ],
