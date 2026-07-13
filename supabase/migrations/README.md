@@ -11,6 +11,7 @@ Supabase SQL Editor で次の順に実行してください。
 3. `migrations/003_rls_policies.sql`
 4. `migrations/004_public_master_data_read_policies.sql`
 5. `migrations/005_public_member_search_view.sql`
+6. `migrations/006_member_public_profile_details.sql`
 
 既存の本番データベースへそのまま流す用途ではなく、初期構築用です。実行前に対象プロジェクトが正しいことを確認してください。
 
@@ -91,6 +92,13 @@ select public.accept_message_request('<message_request_uuid>');
 `member_search_profiles` ビューを作成します。このビューはアクティブな他ユーザーだけを返し、
 ブロック関係と自分自身を除外します。メールアドレス、電話番号、認証ID、生年月日、管理情報、
 決済情報などはビューに含めません。`users` テーブルへのSELECT権限や既存RLSは変更しません。
+
+## メンバー詳細
+
+`006_member_public_profile_details.sql` は、`member_search_profiles` の公開・除外条件を引き継いだ
+メンバー詳細用ビューを作成します。追加する列は `favorite_artists`、`gear`、
+`activity_frequency`、`activity_days` のみです。いずれも既存の公開プロフィール設計に含まれる
+フィールドであり、認証済み利用者だけがSELECTできます。
 
 ユーザー自身の退会は次のRPCを使います。
 

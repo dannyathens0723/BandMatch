@@ -19,4 +19,14 @@ class MemberSearchService {
         .map((row) => MemberProfile.fromJson(row as Map<String, dynamic>))
         .toList();
   }
+
+  Future<MemberProfile?> fetchMemberDetail(String memberId) async {
+    final row = await _client
+        .from('member_public_profile_details')
+        .select()
+        .eq('id', memberId)
+        .maybeSingle();
+
+    return row == null ? null : MemberProfile.fromJson(row);
+  }
 }

@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/member_profile.dart';
 
 class MemberCard extends StatelessWidget {
-  const MemberCard({super.key, required this.member});
+  const MemberCard({super.key, required this.member, this.onTap});
 
   final MemberProfile member;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -18,71 +19,78 @@ class MemberCard extends StatelessWidget {
     ];
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _Avatar(
-                  avatarUrl: member.avatarUrl,
-                  displayName: member.displayName,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        member.displayName,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      if (subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle.join(' ・ '),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        mouseCursor: onTap == null
+            ? MouseCursor.defer
+            : SystemMouseCursors.click,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _Avatar(
+                    avatarUrl: member.avatarUrl,
+                    displayName: member.displayName,
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          member.displayName,
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        if (subtitle.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle.join(' ・ '),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (member.purposes.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _TagGroup(
+                  icon: Icons.flag_outlined,
+                  labels: member.purposes.map(_purposeLabel).toList(),
                 ),
               ],
-            ),
-            if (member.purposes.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _TagGroup(
-                icon: Icons.flag_outlined,
-                labels: member.purposes.map(_purposeLabel).toList(),
-              ),
+              if (member.partNames.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _TagGroup(
+                  icon: Icons.music_note_outlined,
+                  labels: member.partNames,
+                ),
+              ],
+              if (member.genreNames.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _TagGroup(
+                  icon: Icons.queue_music_outlined,
+                  labels: member.genreNames,
+                ),
+              ],
+              if (member.areaNames.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _TagGroup(
+                  icon: Icons.location_on_outlined,
+                  labels: member.areaNames,
+                ),
+              ],
+              if (member.bio case final bio? when bio.trim().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(bio, maxLines: 3, overflow: TextOverflow.ellipsis),
+              ],
             ],
-            if (member.partNames.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _TagGroup(
-                icon: Icons.music_note_outlined,
-                labels: member.partNames,
-              ),
-            ],
-            if (member.genreNames.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _TagGroup(
-                icon: Icons.queue_music_outlined,
-                labels: member.genreNames,
-              ),
-            ],
-            if (member.areaNames.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              _TagGroup(
-                icon: Icons.location_on_outlined,
-                labels: member.areaNames,
-              ),
-            ],
-            if (member.bio case final bio? when bio.trim().isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(bio, maxLines: 3, overflow: TextOverflow.ellipsis),
-            ],
-          ],
+          ),
         ),
       ),
     );

@@ -11,6 +11,10 @@ class MemberProfile {
     required this.partNames,
     required this.genreNames,
     required this.areaNames,
+    this.favoriteArtists,
+    this.gear,
+    this.activityFrequency,
+    this.activityDays,
   });
 
   final String id;
@@ -24,6 +28,10 @@ class MemberProfile {
   final List<String> partNames;
   final List<String> genreNames;
   final List<String> areaNames;
+  final String? favoriteArtists;
+  final String? gear;
+  final String? activityFrequency;
+  final String? activityDays;
 
   factory MemberProfile.fromJson(Map<String, dynamic> json) {
     return MemberProfile(
@@ -38,6 +46,10 @@ class MemberProfile {
       partNames: _stringList(json['part_names']),
       genreNames: _stringList(json['genre_names']),
       areaNames: _stringList(json['area_names']),
+      favoriteArtists: json['favorite_artists'] as String?,
+      gear: json['gear'] as String?,
+      activityFrequency: json['activity_frequency'] as String?,
+      activityDays: json['activity_days'] as String?,
     );
   }
 

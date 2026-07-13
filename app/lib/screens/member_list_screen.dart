@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/member_profile.dart';
 import '../services/member_search_service.dart';
 import '../widgets/member_card.dart';
+import 'member_detail_screen.dart';
 
 class MemberListScreen extends StatefulWidget {
   const MemberListScreen({super.key});
@@ -72,8 +73,18 @@ class _MemberListScreenState extends State<MemberListScreen> {
                         mainAxisExtent: 380,
                       ),
                       itemCount: members.length,
-                      itemBuilder: (context, index) =>
-                          MemberCard(member: members[index]),
+                      itemBuilder: (context, index) {
+                        final member = members[index];
+                        return MemberCard(
+                          member: member,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  MemberDetailScreen(memberId: member.id),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
