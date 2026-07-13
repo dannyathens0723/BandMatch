@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/master_data_item.dart';
+import 'member_list_screen.dart';
 import '../services/master_data_service.dart';
 import '../widgets/master_data_section.dart';
 
@@ -50,6 +51,13 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.refresh),
           ),
           IconButton(
+            tooltip: 'メンバーを探す',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const MemberListScreen()),
+            ),
+            icon: const Icon(Icons.people_outline),
+          ),
+          IconButton(
             tooltip: 'サインアウト',
             onPressed: _isSigningOut ? null : _signOut,
             icon: _isSigningOut
@@ -91,6 +99,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         'プロフィールの設定が完了しました。',
                         style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const MemberListScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.people_outline),
+                        label: const Text('メンバーを探す'),
                       ),
                       const SizedBox(height: 28),
                       LayoutBuilder(
