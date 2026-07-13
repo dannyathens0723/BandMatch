@@ -22,4 +22,13 @@ void main() {
     expect(callback.hasAuthParameters, isTrue);
     expect(callback.authErrorMessage, contains('有効期限'));
   });
+
+  test('password recovery callback is detected safely', () {
+    final callback = AuthCallbackInfo.fromUri(
+      Uri.parse('http://localhost:3000/?code=recovery-code&type=recovery'),
+    );
+
+    expect(callback.hasAuthParameters, isTrue);
+    expect(callback.isPasswordRecovery, isTrue);
+  });
 }

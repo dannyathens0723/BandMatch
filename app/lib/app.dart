@@ -7,6 +7,7 @@ import 'config/app_config.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_setup_screen.dart';
+import 'screens/password_setup_screen.dart';
 import 'services/auth_callback.dart';
 import 'services/profile_service.dart';
 import 'theme/app_theme.dart';
@@ -41,6 +42,7 @@ class _AuthGateState extends State<AuthGate> {
   User? _user;
   String? _error;
   String? _authMessage;
+  bool _isPasswordRecovery = false;
   int _requestId = 0;
 
   @override
@@ -48,7 +50,7 @@ class _AuthGateState extends State<AuthGate> {
     super.initState();
     _handleInitialCallbackUrl();
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
-      (_) => _resolveCurrentUser(),
+      _handleAuthState,
       onError: _handleAuthStreamError,
     );
     _resolveCurrentUser();
@@ -61,10 +63,18 @@ class _AuthGateState extends State<AuthGate> {
     final callback = AuthCallbackInfo.fromUri(Uri.base);
     if (!callback.hasAuthParameters) return;
 
+    _isPasswordRecovery = callback.isPasswordRecovery;
     if (session == null) {
       _authMessage = callback.authErrorMessage;
     }
     cleanAuthCallbackUrl(Uri.base);
+  }
+
+  void _handleAuthState(AuthState authState) {
+    if (authState.event == AuthChangeEvent.passwordRecovery) {
+      _isPasswordRecovery = true;
+    }
+    _resolveCurrentUser();
   }
 
   void _handleAuthStreamError(Object error) {
@@ -116,7 +126,11 @@ class _AuthGateState extends State<AuthGate> {
       if (!mounted || requestId != _requestId) return;
       setState(() {
         _user = user;
-        _state = profile == null ? _GateState.profileSetup : _GateState.home;
+        _state = _isPasswordRecovery
+            ? _GateState.passwordSetup
+            : profile == null
+            ? _GateState.profileSetup
+            : _GateState.home;
       });
     } catch (error) {
       if (!mounted || requestId != _requestId) return;
@@ -135,6 +149,9 @@ class _AuthGateState extends State<AuthGate> {
         authUser: _user!,
         onSaved: _resolveCurrentUser,
       ),
+      _GateState.passwordSetup => PasswordSetupScreen(
+        onCompleted: _completePasswordRecovery,
+      ),
       _GateState.home => const HomeScreen(),
       _GateState.error => _AuthGateError(
         error: _error!,
@@ -145,9 +162,14 @@ class _AuthGateState extends State<AuthGate> {
       ),
     };
   }
+
+  Future<void> _completePasswordRecovery() async {
+    _isPasswordRecovery = false;
+    await _resolveCurrentUser();
+  }
 }
 
-enum _GateState { loading, auth, profileSetup, home, error }
+enum _GateState { loading, auth, profileSetup, passwordSetup, home, error }
 
 class _AuthGateError extends StatelessWidget {
   const _AuthGateError({required this.error, required this.onRetry});

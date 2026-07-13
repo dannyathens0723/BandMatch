@@ -3,7 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/master_data_item.dart';
 import 'member_list_screen.dart';
+import 'received_message_requests_screen.dart';
 import '../services/master_data_service.dart';
+import '../services/received_message_request_service.dart';
 import '../widgets/master_data_section.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -15,17 +17,44 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final MasterDataService _masterDataService = MasterDataService();
+  final ReceivedMessageRequestService _receivedRequestsService =
+      ReceivedMessageRequestService();
   late Future<MasterData> _masterData;
   bool _isSigningOut = false;
+  int _pendingRequestCount = 0;
 
   @override
   void initState() {
     super.initState();
     _masterData = _masterDataService.fetchActiveMasterData();
+    _loadPendingRequestCount();
   }
 
-  void _reload() =>
-      setState(() => _masterData = _masterDataService.fetchActiveMasterData());
+  void _reload() {
+    setState(() => _masterData = _masterDataService.fetchActiveMasterData());
+    _loadPendingRequestCount();
+  }
+
+  Future<void> _loadPendingRequestCount() async {
+    try {
+      final count = await _receivedRequestsService
+          .fetchPendingReceivedRequestCount();
+      if (mounted) setState(() => _pendingRequestCount = count);
+    } catch (_) {
+      // Keep the icon unbadged when the count cannot be loaded. The inbox
+      // screen provides the explicit retry/error state for real failures.
+      if (mounted) setState(() => _pendingRequestCount = 0);
+    }
+  }
+
+  Future<void> _openReceivedRequests() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const ReceivedMessageRequestsScreen(),
+      ),
+    );
+    if (mounted) await _loadPendingRequestCount();
+  }
 
   Future<void> _signOut() async {
     setState(() => _isSigningOut = true);
@@ -56,6 +85,10 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute<void>(builder: (_) => const MemberListScreen()),
             ),
             icon: const Icon(Icons.people_outline),
+          ),
+          _MessageRequestInboxButton(
+            hasPendingRequests: _pendingRequestCount > 0,
+            onPressed: _openReceivedRequests,
           ),
           IconButton(
             tooltip: 'サインアウト',
@@ -156,6 +189,27 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+}
+
+class _MessageRequestInboxButton extends StatelessWidget {
+  const _MessageRequestInboxButton({
+    required this.hasPendingRequests,
+    required this.onPressed,
+  });
+
+  final bool hasPendingRequests;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = IconButton(
+      tooltip: 'メッセージリクエスト',
+      onPressed: onPressed,
+      icon: const Icon(Icons.mail_outline),
+    );
+    if (!hasPendingRequests) return button;
+    return Badge(smallSize: 9, child: button);
   }
 }
 

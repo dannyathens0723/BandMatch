@@ -5,10 +5,12 @@ import 'auth_url_cleaner_stub.dart'
 class AuthCallbackInfo {
   const AuthCallbackInfo({
     required this.hasAuthParameters,
+    required this.isPasswordRecovery,
     this.authErrorMessage,
   });
 
   final bool hasAuthParameters;
+  final bool isPasswordRecovery;
   final String? authErrorMessage;
 
   static const _authParameterNames = {
@@ -17,6 +19,8 @@ class AuthCallbackInfo {
     'error_description',
     'code',
     'token',
+    'token_hash',
+    'type',
     'access_token',
     'refresh_token',
   };
@@ -39,6 +43,7 @@ class AuthCallbackInfo {
 
     return AuthCallbackInfo(
       hasAuthParameters: hasAuthParameters,
+      isPasswordRecovery: parameters['type'] == 'recovery',
       authErrorMessage: hasError
           ? _messageForError(errorCode, errorDescription)
           : null,

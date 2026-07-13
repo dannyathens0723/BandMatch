@@ -13,6 +13,7 @@ Supabase SQL Editor で次の順に実行してください。
 5. `migrations/005_public_member_search_view.sql`
 6. `migrations/006_member_public_profile_details.sql`
 7. `migrations/007_message_request_pending_uniqueness.sql`
+8. `migrations/008_received_message_requests_view.sql`
 
 既存の本番データベースへそのまま流す用途ではなく、初期構築用です。実行前に対象プロジェクトが正しいことを確認してください。
 
