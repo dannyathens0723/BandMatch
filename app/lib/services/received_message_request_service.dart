@@ -35,11 +35,15 @@ class ReceivedMessageRequestService {
 
   /// The database function verifies the recipient and atomically creates the
   /// message room and participants with the accepted request.
-  Future<void> acceptRequest(String requestId) async {
-    await _client.rpc(
+  Future<String> acceptRequest(String requestId) async {
+    final roomId = await _client.rpc(
       'accept_message_request',
       params: {'p_request_id': requestId},
     );
+    if (roomId is! String || roomId.isEmpty) {
+      throw StateError('メッセージルームを作成できませんでした。');
+    }
+    return roomId;
   }
 
   Future<void> rejectRequest(String requestId) async {

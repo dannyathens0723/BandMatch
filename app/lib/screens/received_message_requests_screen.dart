@@ -28,10 +28,44 @@ class _ReceivedMessageRequestsScreenState
   }
 
   Future<void> _accept(ReceivedMessageRequest request) async {
-    await _process(
-      request,
-      action: _service.acceptRequest,
-      successMessage: 'リクエストを承認しました',
+    setState(() => _processingRequestIds.add(request.id));
+    try {
+      final roomId = await _service.acceptRequest(request.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('リクエストを承認しました'),
+          action: SnackBarAction(
+            label: 'メッセージルームを開く',
+            onPressed: () => _showRoomPlaceholder(roomId),
+          ),
+        ),
+      );
+      _reload();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('承認に失敗しました。時間をおいて再度お試しください。')),
+      );
+    } finally {
+      if (mounted) setState(() => _processingRequestIds.remove(request.id));
+    }
+  }
+
+  void _showRoomPlaceholder(String roomId) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.forum_outlined),
+        title: const Text('メッセージルーム'),
+        content: const Text('チャット画面は次のステップで実装します'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
     );
   }
 
