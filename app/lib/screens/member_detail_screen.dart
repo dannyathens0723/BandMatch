@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/member_profile.dart';
 import '../services/member_search_service.dart';
+import '../services/message_request_service.dart';
+import '../widgets/message_request_sheet.dart';
 
 class MemberDetailScreen extends StatefulWidget {
   const MemberDetailScreen({super.key, required this.memberId});
@@ -14,24 +16,64 @@ class MemberDetailScreen extends StatefulWidget {
 
 class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final _memberSearchService = MemberSearchService();
+  final _messageRequestService = MessageRequestService();
   late Future<MemberProfile?> _member;
+  bool _isRequestStateLoading = true;
+  bool _hasPendingRequest = false;
+  String? _requestStateError;
 
   @override
   void initState() {
     super.initState();
     _member = _memberSearchService.fetchMemberDetail(widget.memberId);
+    _loadRequestState();
   }
 
   void _reload() {
     setState(
       () => _member = _memberSearchService.fetchMemberDetail(widget.memberId),
     );
+    _loadRequestState();
   }
 
-  void _showMessagePlaceholder() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('メッセージ機能は次のステップで実装します')));
+  Future<void> _loadRequestState() async {
+    setState(() {
+      _isRequestStateLoading = true;
+      _requestStateError = null;
+    });
+    try {
+      final hasPending = await _messageRequestService.hasPendingRequest(
+        widget.memberId,
+      );
+      if (mounted) setState(() => _hasPendingRequest = hasPending);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _requestStateError = 'リクエスト状態を確認できませんでした。');
+      }
+    } finally {
+      if (mounted) setState(() => _isRequestStateLoading = false);
+    }
+  }
+
+  Future<void> _openRequestSheet(MemberProfile member) async {
+    final wasSent = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => MessageRequestSheet(
+        receiverName: member.displayName,
+        onSubmit: (message) => _messageRequestService.sendRequest(
+          receiverUserId: member.id,
+          message: message,
+        ),
+      ),
+    );
+
+    if (wasSent == true && mounted) {
+      setState(() => _hasPendingRequest = true);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('メッセージリクエストを送信しました')));
+    }
   }
 
   @override
@@ -127,10 +169,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      FilledButton.icon(
-                        onPressed: _showMessagePlaceholder,
-                        icon: const Icon(Icons.mail_outline),
-                        label: const Text('メッセージを送る'),
+                      _MessageRequestButton(
+                        isLoading: _isRequestStateLoading,
+                        isPending: _hasPendingRequest,
+                        error: _requestStateError,
+                        onPressed: () => _openRequestSheet(member),
                       ),
                     ],
                   ),
@@ -169,6 +212,45 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       'daily' => 'ほぼ毎日',
       _ => value,
     };
+  }
+}
+
+class _MessageRequestButton extends StatelessWidget {
+  const _MessageRequestButton({
+    required this.isLoading,
+    required this.isPending,
+    required this.error,
+    required this.onPressed,
+  });
+
+  final bool isLoading;
+  final bool isPending;
+  final String? error;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const SizedBox(
+        height: 48,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (error case final requestError?) ...[
+          Text(requestError, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 8),
+        ],
+        FilledButton.icon(
+          onPressed: isPending ? null : onPressed,
+          icon: Icon(isPending ? Icons.schedule : Icons.mail_outline),
+          label: Text(isPending ? 'メッセージリクエスト送信済み' : 'メッセージを送る'),
+        ),
+      ],
+    );
   }
 }
 

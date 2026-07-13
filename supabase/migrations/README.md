@@ -12,6 +12,7 @@ Supabase SQL Editor で次の順に実行してください。
 4. `migrations/004_public_master_data_read_policies.sql`
 5. `migrations/005_public_member_search_view.sql`
 6. `migrations/006_member_public_profile_details.sql`
+7. `migrations/007_message_request_pending_uniqueness.sql`
 
 既存の本番データベースへそのまま流す用途ではなく、初期構築用です。実行前に対象プロジェクトが正しいことを確認してください。
 
@@ -99,6 +100,13 @@ select public.accept_message_request('<message_request_uuid>');
 メンバー詳細用ビューを作成します。追加する列は `favorite_artists`、`gear`、
 `activity_frequency`、`activity_days` のみです。いずれも既存の公開プロフィール設計に含まれる
 フィールドであり、認証済み利用者だけがSELECTできます。
+
+## メッセージリクエスト
+
+`007_message_request_pending_uniqueness.sql` は、同じ個人送信者から同じ個人受信者へ
+`pending` のリクエストを複数作成できないようにする部分ユニークインデックスです。
+既存の `requests_insert_sender` ポリシーは、送信者本人、双方の有効状態、ブロック関係を確認するため、
+RLSポリシーは変更しません。承認時は引き続き `accept_message_request(uuid)` RPC を使用します。
 
 ユーザー自身の退会は次のRPCを使います。
 
