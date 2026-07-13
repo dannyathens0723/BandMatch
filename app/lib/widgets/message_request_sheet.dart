@@ -38,7 +38,7 @@ class _MessageRequestSheetState extends State<MessageRequestSheet> {
     try {
       await widget.onSubmit(_messageController.text);
       if (mounted) Navigator.of(context).pop(true);
-    } on MessageRequestAlreadyPending {
+    } on MessageRequestRelationshipExists {
       if (mounted) {
         setState(() => _error = 'すでに保留中のメッセージリクエストがあります。');
       }

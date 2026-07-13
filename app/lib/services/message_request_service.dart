@@ -1,71 +1,47 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'profile_service.dart';
+import '../models/member_relationship.dart';
 
-class MessageRequestAlreadyPending implements Exception {
-  const MessageRequestAlreadyPending();
+class MessageRequestRelationshipExists implements Exception {
+  const MessageRequestRelationshipExists();
 }
 
 class MessageRequestService {
-  MessageRequestService({
-    SupabaseClient? client,
-    ProfileService? profileService,
-  }) : _client = client ?? Supabase.instance.client,
-       _profileService = profileService ?? ProfileService(client: client);
+  MessageRequestService({SupabaseClient? client})
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
-  final ProfileService _profileService;
 
-  Future<bool> hasPendingRequest(String receiverUserId) async {
-    final senderUserId = await _currentProfileId();
-    if (senderUserId == receiverUserId) return false;
-
-    final row = await _client
-        .from('message_requests')
-        .select('id')
-        .eq('sender_user_id', senderUserId)
-        .eq('receiver_user_id', receiverUserId)
-        .eq('status', 'pending')
-        .isFilter('sender_group_id', null)
-        .isFilter('receiver_group_id', null)
-        .maybeSingle();
-
-    return row != null;
+  Future<MemberRelationship> fetchRelationship(String targetUserId) async {
+    final result = await _client.rpc(
+      'get_member_relationship_state',
+      params: {'p_target_user_id': targetUserId},
+    );
+    if (result is! List || result.isEmpty || result.first is! Map) {
+      throw StateError('メンバーとの関係を確認できませんでした。');
+    }
+    return MemberRelationship.fromJson(
+      Map<String, dynamic>.from(result.first as Map),
+    );
   }
 
   Future<void> sendRequest({
     required String receiverUserId,
     required String message,
   }) async {
-    final senderUserId = await _currentProfileId();
     final note = message.trim();
-
-    if (senderUserId == receiverUserId) {
-      throw ArgumentError('自分自身にはメッセージリクエストを送信できません。');
-    }
     if (note.isEmpty || note.length > 300) {
       throw ArgumentError('メッセージは1〜300文字で入力してください。');
     }
 
     try {
-      await _client.from('message_requests').insert({
-        'sender_user_id': senderUserId,
-        'receiver_user_id': receiverUserId,
-        'status': 'pending',
-        'note': note,
-      });
+      await _client.rpc(
+        'send_message_request',
+        params: {'p_target_user_id': receiverUserId, 'p_note': note},
+      );
     } on PostgrestException catch (error) {
-      if (error.code == '23505') throw const MessageRequestAlreadyPending();
+      if (error.code == '23505') throw const MessageRequestRelationshipExists();
       rethrow;
     }
-  }
-
-  Future<String> _currentProfileId() async {
-    final authUser = _client.auth.currentUser;
-    if (authUser == null) throw StateError('サインインが必要です。');
-
-    final profile = await _profileService.fetchCurrentProfile(authUser.id);
-    if (profile == null) throw StateError('プロフィールを設定してください。');
-    return profile.id;
   }
 }

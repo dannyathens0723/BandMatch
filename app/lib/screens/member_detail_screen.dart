@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/member_relationship.dart';
 import '../models/member_profile.dart';
 import '../services/member_search_service.dart';
 import '../services/message_request_service.dart';
 import '../widgets/message_request_sheet.dart';
+import 'received_message_requests_screen.dart';
 
 class MemberDetailScreen extends StatefulWidget {
   const MemberDetailScreen({super.key, required this.memberId});
@@ -19,7 +21,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final _messageRequestService = MessageRequestService();
   late Future<MemberProfile?> _member;
   bool _isRequestStateLoading = true;
-  bool _hasPendingRequest = false;
+  MemberRelationship? _relationship;
   String? _requestStateError;
 
   @override
@@ -40,12 +42,13 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     setState(() {
       _isRequestStateLoading = true;
       _requestStateError = null;
+      _relationship = null;
     });
     try {
-      final hasPending = await _messageRequestService.hasPendingRequest(
+      final relationship = await _messageRequestService.fetchRelationship(
         widget.memberId,
       );
-      if (mounted) setState(() => _hasPendingRequest = hasPending);
+      if (mounted) setState(() => _relationship = relationship);
     } catch (_) {
       if (mounted) {
         setState(() => _requestStateError = 'リクエスト状態を確認できませんでした。');
@@ -68,12 +71,12 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       ),
     );
 
-    if (wasSent == true && mounted) {
-      setState(() => _hasPendingRequest = true);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('メッセージリクエストを送信しました')));
-    }
+    if (wasSent != true || !mounted) return;
+    await _loadRequestState();
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('メッセージリクエストを送信しました')));
   }
 
   @override
@@ -171,9 +174,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       const SizedBox(height: 24),
                       _MessageRequestButton(
                         isLoading: _isRequestStateLoading,
-                        isPending: _hasPendingRequest,
+                        relationship: _relationship,
                         error: _requestStateError,
-                        onPressed: () => _openRequestSheet(member),
+                        onSendRequest: () => _openRequestSheet(member),
+                        onOpenInbox: _openReceivedRequests,
+                        onOpenRoom: _showRoomPlaceholder,
                       ),
                     ],
                   ),
@@ -213,20 +218,50 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       _ => value,
     };
   }
+
+  Future<void> _openReceivedRequests() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const ReceivedMessageRequestsScreen(),
+      ),
+    );
+    if (mounted) await _loadRequestState();
+  }
+
+  void _showRoomPlaceholder() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.forum_outlined),
+        title: const Text('メッセージルーム'),
+        content: const Text('チャット画面は次のステップで実装します'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MessageRequestButton extends StatelessWidget {
   const _MessageRequestButton({
     required this.isLoading,
-    required this.isPending,
+    required this.relationship,
     required this.error,
-    required this.onPressed,
+    required this.onSendRequest,
+    required this.onOpenInbox,
+    required this.onOpenRoom,
   });
 
   final bool isLoading;
-  final bool isPending;
+  final MemberRelationship? relationship;
   final String? error;
-  final VoidCallback onPressed;
+  final VoidCallback onSendRequest;
+  final VoidCallback onOpenInbox;
+  final VoidCallback onOpenRoom;
 
   @override
   Widget build(BuildContext context) {
@@ -244,13 +279,46 @@ class _MessageRequestButton extends StatelessWidget {
           Text(requestError, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 8),
         ],
-        FilledButton.icon(
-          onPressed: isPending ? null : onPressed,
-          icon: Icon(isPending ? Icons.schedule : Icons.mail_outline),
-          label: Text(isPending ? 'メッセージリクエスト送信済み' : 'メッセージを送る'),
-        ),
+        _buttonForState(context),
       ],
     );
+  }
+
+  Widget _buttonForState(BuildContext context) {
+    final state = relationship?.state;
+    return switch (state) {
+      MemberRelationshipState.none => FilledButton.icon(
+        onPressed: onSendRequest,
+        icon: const Icon(Icons.mail_outline),
+        label: const Text('メッセージを送る'),
+      ),
+      MemberRelationshipState.outgoingPending => FilledButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.schedule),
+        label: const Text('メッセージリクエスト送信済み'),
+      ),
+      MemberRelationshipState.incomingPending => OutlinedButton.icon(
+        onPressed: onOpenInbox,
+        icon: const Icon(Icons.mark_email_unread_outlined),
+        label: const Text('届いているリクエストを確認'),
+      ),
+      MemberRelationshipState.accepted || MemberRelationshipState.roomExists =>
+        FilledButton.icon(
+          onPressed: onOpenRoom,
+          icon: const Icon(Icons.forum_outlined),
+          label: const Text('メッセージルームを開く'),
+        ),
+      MemberRelationshipState.rejected => FilledButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.block_outlined),
+        label: const Text('リクエストは終了しました'),
+      ),
+      null => FilledButton.icon(
+        onPressed: null,
+        icon: const Icon(Icons.mail_outline),
+        label: const Text('メッセージを送る'),
+      ),
+    };
   }
 }
 
