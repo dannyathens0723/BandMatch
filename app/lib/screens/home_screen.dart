@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/master_data_item.dart';
 import 'chat_rooms_screen.dart';
 import 'member_list_screen.dart';
+import 'profile_edit_screen.dart';
 import 'received_message_requests_screen.dart';
 import '../services/master_data_service.dart';
 import '../services/received_message_request_service.dart';
@@ -88,6 +89,15 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.people_outline),
           ),
           IconButton(
+            tooltip: 'プロフィール編集',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ProfileEditScreen(),
+              ),
+            ),
+            icon: const Icon(Icons.account_circle_outlined),
+          ),
+          IconButton(
             tooltip: 'メッセージ',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const ChatRoomsScreen()),
@@ -160,6 +170,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         icon: const Icon(Icons.forum_outlined),
                         label: const Text('メッセージ'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const ProfileEditScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.account_circle_outlined),
+                        label: const Text('プロフィール編集'),
                       ),
                       const SizedBox(height: 28),
                       LayoutBuilder(
