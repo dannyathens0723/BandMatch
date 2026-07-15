@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/master_data_item.dart';
-import 'chat_rooms_screen.dart';
-import 'member_list_screen.dart';
-import 'profile_edit_screen.dart';
-import 'received_message_requests_screen.dart';
 import '../services/master_data_service.dart';
 import '../services/received_message_request_service.dart';
 import '../widgets/master_data_section.dart';
+import 'chat_rooms_screen.dart';
+import 'member_list_screen.dart';
+import 'my_page_screen.dart';
+import 'received_message_requests_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final ReceivedMessageRequestService _receivedRequestsService =
       ReceivedMessageRequestService();
   late Future<MasterData> _masterData;
-  bool _isSigningOut = false;
   int _pendingRequestCount = 0;
 
   @override
@@ -43,8 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .fetchPendingReceivedRequestCount();
       if (mounted) setState(() => _pendingRequestCount = count);
     } catch (_) {
-      // Keep the icon unbadged when the count cannot be loaded. The inbox
-      // screen provides the explicit retry/error state for real failures.
       if (mounted) setState(() => _pendingRequestCount = 0);
     }
   }
@@ -58,16 +54,22 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) await _loadPendingRequestCount();
   }
 
-  Future<void> _signOut() async {
-    setState(() => _isSigningOut = true);
-    try {
-      await Supabase.instance.client.auth.signOut();
-    } on AuthException {
-      // A network failure must not leave a usable local session behind.
-      await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
-    } finally {
-      if (mounted) setState(() => _isSigningOut = false);
-    }
+  void _openMemberList() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MemberListScreen()));
+  }
+
+  void _openChatRooms() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ChatRoomsScreen()));
+  }
+
+  void _openMyPage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MyPageScreen()));
   }
 
   @override
@@ -83,25 +85,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             tooltip: 'メンバーを探す',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const MemberListScreen()),
-            ),
+            onPressed: _openMemberList,
             icon: const Icon(Icons.people_outline),
           ),
           IconButton(
-            tooltip: 'プロフィール編集',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ProfileEditScreen(),
-              ),
-            ),
-            icon: const Icon(Icons.account_circle_outlined),
-          ),
-          IconButton(
             tooltip: 'メッセージ',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const ChatRoomsScreen()),
-            ),
+            onPressed: _openChatRooms,
             icon: const Icon(Icons.forum_outlined),
           ),
           _MessageRequestInboxButton(
@@ -109,15 +98,9 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _openReceivedRequests,
           ),
           IconButton(
-            tooltip: 'サインアウト',
-            onPressed: _isSigningOut ? null : _signOut,
-            icon: _isSigningOut
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.logout),
+            tooltip: 'マイページ',
+            onPressed: _openMyPage,
+            icon: const Icon(Icons.account_circle_outlined),
           ),
           const SizedBox(width: 12),
         ],
@@ -136,50 +119,38 @@ class _HomeScreenState extends State<HomeScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError) {
-                    return _LoadError(error: snapshot.error!, onRetry: _reload);
+                    return _LoadError(onRetry: _reload);
                   }
 
                   final data = snapshot.requireData;
                   return ListView(
                     children: [
                       Text(
-                        'まずは、音楽でつながろう。',
+                        'まずは、音楽でつながろう',
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'プロフィールの設定が完了しました。',
+                        'プロフィールやメッセージを使って、気になるメンバーと出会えます。',
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                       const SizedBox(height: 20),
                       FilledButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const MemberListScreen(),
-                          ),
-                        ),
+                        onPressed: _openMemberList,
                         icon: const Icon(Icons.people_outline),
                         label: const Text('メンバーを探す'),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ChatRoomsScreen(),
-                          ),
-                        ),
+                        onPressed: _openChatRooms,
                         icon: const Icon(Icons.forum_outlined),
                         label: const Text('メッセージ'),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const ProfileEditScreen(),
-                          ),
-                        ),
+                        onPressed: _openMyPage,
                         icon: const Icon(Icons.account_circle_outlined),
-                        label: const Text('プロフィール編集'),
+                        label: const Text('マイページ'),
                       ),
                       const SizedBox(height: 28),
                       LayoutBuilder(
@@ -187,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           final isWide = constraints.maxWidth >= 760;
                           final sections = [
                             MasterDataSection(
-                              title: '担当パート',
+                              title: 'パート',
                               description: '募集・参加したいパートの選択肢',
                               items: data.parts,
                               icon: Icons.music_note_outlined,
@@ -252,9 +223,8 @@ class _MessageRequestInboxButton extends StatelessWidget {
 }
 
 class _LoadError extends StatelessWidget {
-  const _LoadError({required this.error, required this.onRetry});
+  const _LoadError({required this.onRetry});
 
-  final Object error;
   final VoidCallback onRetry;
 
   @override
@@ -269,8 +239,6 @@ class _LoadError extends StatelessWidget {
               const Icon(Icons.cloud_off_outlined, size: 40),
               const SizedBox(height: 16),
               const Text('データを表示できません'),
-              const SizedBox(height: 8),
-              Text('詳細: $error'),
               const SizedBox(height: 16),
               FilledButton(onPressed: onRetry, child: const Text('再読み込み')),
             ],

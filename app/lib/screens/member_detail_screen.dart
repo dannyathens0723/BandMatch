@@ -5,6 +5,7 @@ import '../models/member_profile.dart';
 import '../services/member_search_service.dart';
 import '../services/message_request_service.dart';
 import '../widgets/message_request_sheet.dart';
+import 'chat_room_screen.dart';
 import 'received_message_requests_screen.dart';
 
 class MemberDetailScreen extends StatefulWidget {
@@ -178,7 +179,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         error: _requestStateError,
                         onSendRequest: () => _openRequestSheet(member),
                         onOpenInbox: _openReceivedRequests,
-                        onOpenRoom: _showRoomPlaceholder,
+                        onOpenRoom: () => _openRoom(member),
                       ),
                     ],
                   ),
@@ -228,19 +229,19 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     if (mounted) await _loadRequestState();
   }
 
-  void _showRoomPlaceholder() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.forum_outlined),
-        title: const Text('メッセージルーム'),
-        content: const Text('チャット画面は次のステップで実装します'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
-          ),
-        ],
+  void _openRoom(MemberProfile member) {
+    final roomId = _relationship?.roomId;
+    if (roomId == null || roomId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('メッセージルームを開けませんでした。時間をおいて再度お試しください。')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ChatRoomScreen(roomId: roomId, roomTitle: member.displayName),
       ),
     );
   }
@@ -302,12 +303,12 @@ class _MessageRequestButton extends StatelessWidget {
         icon: const Icon(Icons.mark_email_unread_outlined),
         label: const Text('届いているリクエストを確認'),
       ),
-      MemberRelationshipState.accepted || MemberRelationshipState.roomExists =>
-        FilledButton.icon(
-          onPressed: onOpenRoom,
-          icon: const Icon(Icons.forum_outlined),
-          label: const Text('メッセージルームを開く'),
-        ),
+      MemberRelationshipState.accepted ||
+      MemberRelationshipState.roomExists => FilledButton.icon(
+        onPressed: onOpenRoom,
+        icon: const Icon(Icons.forum_outlined),
+        label: const Text('メッセージルームを開く'),
+      ),
       MemberRelationshipState.rejected => FilledButton.icon(
         onPressed: null,
         icon: const Icon(Icons.block_outlined),

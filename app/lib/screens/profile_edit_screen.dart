@@ -89,9 +89,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('プロフィールを更新しました')));
+      Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
