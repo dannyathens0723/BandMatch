@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/chat_room_summary.dart';
 import '../services/chat_room_service.dart';
+import 'chat_room_screen.dart';
 
 class ChatRoomsScreen extends StatefulWidget {
   const ChatRoomsScreen({super.key});
@@ -22,11 +23,12 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
 
   void _reload() => setState(() => _rooms = _service.fetchMyChatRooms());
 
-  void _showChatPlaceholder() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('チャット画面は次のステップで実装します')));
-  }
+  void _openRoom(ChatRoomSummary room) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) =>
+          ChatRoomScreen(roomId: room.roomId, roomTitle: room.displayName),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +66,7 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) => _ChatRoomCard(
                     room: rooms[index],
-                    onTap: _showChatPlaceholder,
+                    onTap: () => _openRoom(rooms[index]),
                   ),
                 ),
               ),
