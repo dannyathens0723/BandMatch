@@ -2,17 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/chat_room_message.dart';
-import 'profile_service.dart';
 
 class ChatRoomMessageService {
-  ChatRoomMessageService({
-    SupabaseClient? client,
-    ProfileService? profileService,
-  }) : _client = client ?? Supabase.instance.client,
-       _profileService = profileService ?? ProfileService(client: client);
+  ChatRoomMessageService({SupabaseClient? client})
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
-  final ProfileService _profileService;
 
   Future<List<ChatRoomMessage>> fetchMessages(String roomId) async {
     try {
@@ -79,11 +74,10 @@ class ChatRoomMessageService {
   }
 
   Future<String> fetchCurrentProfileId() async {
-    final authUser = _client.auth.currentUser;
-    if (authUser == null) throw StateError('サインインが必要です。');
-
-    final profile = await _profileService.fetchCurrentProfile(authUser.id);
-    if (profile == null) throw StateError('プロフィールが見つかりません。');
-    return profile.id;
+    final profileId = await _client.rpc('current_user_id');
+    if (profileId is! String || profileId.isEmpty) {
+      throw StateError('プロフィールが見つかりません。');
+    }
+    return profileId;
   }
 }
