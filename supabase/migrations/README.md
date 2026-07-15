@@ -16,6 +16,9 @@ Supabase SQL Editor で次の順に実行してください。
 8. `migrations/008_received_message_requests_view.sql`
 9. `migrations/009_accept_request_create_room.sql`
 10. `migrations/010_message_request_relationship_state.sql`
+11. `migrations/011_chat_rooms_and_messages.sql`
+12. `migrations/012_fix_chat_send_and_request_states.sql`
+13. `migrations/013_fix_chat_send_refresh_warning.sql`
 
 既存の本番データベースへそのまま流す用途ではなく、初期構築用です。実行前に対象プロジェクトが正しいことを確認してください。
 

@@ -5,6 +5,7 @@ import '../models/member_profile.dart';
 import '../services/member_search_service.dart';
 import '../services/message_request_service.dart';
 import '../widgets/message_request_sheet.dart';
+import 'chat_room_screen.dart';
 import 'received_message_requests_screen.dart';
 
 class MemberDetailScreen extends StatefulWidget {
@@ -178,7 +179,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         error: _requestStateError,
                         onSendRequest: () => _openRequestSheet(member),
                         onOpenInbox: _openReceivedRequests,
-                        onOpenRoom: _showRoomPlaceholder,
+                        onOpenRoom: () => _openRoom(member),
                       ),
                     ],
                   ),
@@ -228,19 +229,21 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     if (mounted) await _loadRequestState();
   }
 
-  void _showRoomPlaceholder() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.forum_outlined),
-        title: const Text('メッセージルーム'),
-        content: const Text('チャット画面は次のステップで実装します'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
-          ),
-        ],
+  Future<void> _openRoom(MemberProfile member) async {
+    final roomId = _relationship?.roomId;
+    if (roomId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('メッセージルームを準備できませんでした。')),
+      );
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatRoomScreen(
+          roomId: roomId,
+          roomTitle: member.displayName,
+          otherAvatarUrl: member.avatarUrl,
+        ),
       ),
     );
   }

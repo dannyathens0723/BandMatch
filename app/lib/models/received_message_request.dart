@@ -11,6 +11,7 @@ class ReceivedMessageRequest {
     this.senderExperienceLevel,
     this.note,
     this.respondedAt,
+    this.roomId,
   });
 
   final String id;
@@ -24,8 +25,9 @@ class ReceivedMessageRequest {
   final String? senderExperienceLevel;
   final String? note;
   final DateTime? respondedAt;
+  final String? roomId;
 
-  bool get isPending => status == 'pending';
+  bool get isPending => status == 'pending' && roomId == null;
 
   factory ReceivedMessageRequest.fromJson(Map<String, dynamic> json) {
     return ReceivedMessageRequest(
@@ -40,6 +42,7 @@ class ReceivedMessageRequest {
       senderAvatarUrl: json['avatar_url'] as String?,
       senderExperienceLevel: json['experience_level'] as String?,
       note: json['note'] as String?,
+      roomId: json['room_id'] as String?,
       partNames: _stringList(json['part_names']),
       genreNames: _stringList(json['genre_names']),
     );

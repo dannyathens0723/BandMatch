@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/master_data_item.dart';
+import 'chat_rooms_screen.dart';
 import 'member_list_screen.dart';
 import 'received_message_requests_screen.dart';
 import '../services/master_data_service.dart';
@@ -85,6 +86,13 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute<void>(builder: (_) => const MemberListScreen()),
             ),
             icon: const Icon(Icons.people_outline),
+          ),
+          IconButton(
+            tooltip: 'メッセージ',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ChatRoomsScreen()),
+            ),
+            icon: const Icon(Icons.forum_outlined),
           ),
           _MessageRequestInboxButton(
             hasPendingRequests: _pendingRequestCount > 0,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/received_message_request.dart';
 import '../services/received_message_request_service.dart';
+import 'chat_room_screen.dart';
 
 class ReceivedMessageRequestsScreen extends StatefulWidget {
   const ReceivedMessageRequestsScreen({super.key});
@@ -37,7 +38,7 @@ class _ReceivedMessageRequestsScreenState
           content: const Text('リクエストを承認しました'),
           action: SnackBarAction(
             label: 'メッセージルームを開く',
-            onPressed: () => _showRoomPlaceholder(roomId),
+            onPressed: () => _openRoom(roomId, request),
           ),
         ),
       );
@@ -52,19 +53,17 @@ class _ReceivedMessageRequestsScreenState
     }
   }
 
-  void _showRoomPlaceholder(String roomId) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.forum_outlined),
-        title: const Text('メッセージルーム'),
-        content: const Text('チャット画面は次のステップで実装します'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
-          ),
-        ],
+  Future<void> _openRoom(
+    String roomId,
+    ReceivedMessageRequest request,
+  ) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatRoomScreen(
+          roomId: roomId,
+          roomTitle: request.senderDisplayName,
+          otherAvatarUrl: request.senderAvatarUrl,
+        ),
       ),
     );
   }
@@ -141,6 +140,9 @@ class _ReceivedMessageRequestsScreenState
                       isProcessing: _processingRequestIds.contains(request.id),
                       onAccept: () => _accept(request),
                       onReject: () => _reject(request),
+                      onOpenRoom: request.roomId == null
+                          ? null
+                          : () => _openRoom(request.roomId!, request),
                     );
                   },
                 ),
@@ -159,12 +161,14 @@ class _RequestCard extends StatelessWidget {
     required this.isProcessing,
     required this.onAccept,
     required this.onReject,
+    required this.onOpenRoom,
   });
 
   final ReceivedMessageRequest request;
   final bool isProcessing;
   final VoidCallback onAccept;
   final VoidCallback onReject;
+  final VoidCallback? onOpenRoom;
 
   @override
   Widget build(BuildContext context) {
@@ -259,6 +263,14 @@ class _RequestCard extends StatelessWidget {
                     ],
                   );
                 },
+              ),
+            ],
+            if (request.status == 'accepted' && onOpenRoom != null) ...[
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onOpenRoom,
+                icon: const Icon(Icons.forum_outlined),
+                label: const Text('メッセージルームを開く'),
               ),
             ],
           ],
