@@ -2,6 +2,7 @@ class EditableProfile {
   const EditableProfile({
     required this.id,
     required this.displayName,
+    required this.avatarUrl,
     required this.experienceLevel,
     required this.purposes,
     required this.partIds,
@@ -11,6 +12,7 @@ class EditableProfile {
 
   final String id;
   final String displayName;
+  final String? avatarUrl;
   final String? experienceLevel;
   final Set<String> purposes;
   final Set<String> partIds;

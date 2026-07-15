@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/editable_profile.dart';
 import '../models/master_data_item.dart';
 import '../services/master_data_service.dart';
+import '../services/profile_avatar_service.dart';
 import '../services/profile_service.dart';
 
 class ProfileEditScreen extends StatefulWidget {
@@ -15,14 +16,17 @@ class ProfileEditScreen extends StatefulWidget {
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
+  final _avatarService = ProfileAvatarService();
   final _profileService = ProfileService();
   final _partIds = <String>{};
   final _genreIds = <String>{};
   final _areaIds = <String>{};
   final _purposes = <String>{};
   late Future<MasterData> _masterData;
+  String? _avatarUrl;
   String? _experienceLevel;
   bool _isSaving = false;
+  bool _isUploadingAvatar = false;
 
   @override
   void initState() {
@@ -43,6 +47,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     ]);
     final profile = results[1] as EditableProfile;
     _displayNameController.text = profile.displayName;
+    _avatarUrl = profile.avatarUrl;
     _experienceLevel = profile.experienceLevel;
     _partIds
       ..clear()
@@ -100,6 +105,44 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
+  Future<void> _uploadAvatar() async {
+    if (_isUploadingAvatar) return;
+
+    setState(() => _isUploadingAvatar = true);
+    try {
+      final result = await _avatarService.pickAndUploadAvatar();
+      if (!mounted) return;
+      setState(() => _avatarUrl = result.avatarUrl);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('プロフィール画像を更新しました')));
+    } on ProfileAvatarUploadException catch (error) {
+      if (!mounted ||
+          error.reason == ProfileAvatarUploadFailureReason.canceled) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_avatarUploadErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _isUploadingAvatar = false);
+    }
+  }
+
+  String _avatarUploadErrorMessage(ProfileAvatarUploadException error) {
+    return switch (error.reason) {
+      ProfileAvatarUploadFailureReason.unsupportedPlatform =>
+        'この環境では画像選択を利用できません。',
+      ProfileAvatarUploadFailureReason.unsupportedType =>
+        'JPEG、PNG、WebP の画像を選択してください。',
+      ProfileAvatarUploadFailureReason.fileTooLarge =>
+        'プロフィール画像は5MB以下のファイルを選択してください。',
+      ProfileAvatarUploadFailureReason.uploadFailed =>
+        'プロフィール画像を更新できませんでした。時間をおいて再度お試しください。',
+      ProfileAvatarUploadFailureReason.canceled => '',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,6 +183,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             Text(
                               '公開する音楽プロフィールを更新できます。',
                               style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 24),
+                            _AvatarUploadSection(
+                              avatarUrl: _avatarUrl,
+                              displayName: _displayNameController.text.trim(),
+                              isUploading: _isUploadingAvatar,
+                              onUpload: _uploadAvatar,
                             ),
                             const SizedBox(height: 24),
                             TextFormField(
@@ -262,6 +312,88 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _AvatarUploadSection extends StatelessWidget {
+  const _AvatarUploadSection({
+    required this.avatarUrl,
+    required this.displayName,
+    required this.isUploading,
+    required this.onUpload,
+  });
+
+  final String? avatarUrl;
+  final String displayName;
+  final bool isUploading;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallbackName = displayName.isEmpty ? 'B' : displayName;
+
+    return Row(
+      children: [
+        _ProfileAvatarPreview(avatarUrl: avatarUrl, displayName: fallbackName),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('プロフィール画像', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(
+                'JPEG、PNG、WebP / 5MBまで',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: isUploading ? null : onUpload,
+                icon: isUploading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.image_outlined),
+                label: Text(isUploading ? 'アップロード中' : '画像を変更'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileAvatarPreview extends StatelessWidget {
+  const _ProfileAvatarPreview({
+    required this.avatarUrl,
+    required this.displayName,
+  });
+
+  final String? avatarUrl;
+  final String displayName;
+
+  @override
+  Widget build(BuildContext context) {
+    if (avatarUrl == null || avatarUrl!.isEmpty) {
+      return CircleAvatar(
+        radius: 38,
+        child: Text(displayName.characters.first),
+      );
+    }
+
+    return ClipOval(
+      child: Image.network(
+        avatarUrl!,
+        width: 76,
+        height: 76,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) =>
+            CircleAvatar(radius: 38, child: Text(displayName.characters.first)),
       ),
     );
   }

@@ -68,18 +68,25 @@ class _MyPageScreenState extends State<MyPageScreen> {
     final wasUpdated = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(builder: (_) => const ProfileEditScreen()),
     );
-    if (!mounted || wasUpdated != true) return;
+    if (!mounted) return;
 
     final refreshed = await _loadProfile();
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          refreshed ? 'プロフィールを更新しました' : 'マイページを更新できませんでした。時間をおいて再度お試しください。',
+    if (!refreshed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('マイページを更新できませんでした。時間をおいて再度お試しください。'),
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    if (wasUpdated == true) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('プロフィールを更新しました')));
+    }
   }
 
   Future<void> _signOut() async {

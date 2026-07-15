@@ -26,7 +26,7 @@ class ProfileService {
       final results = await Future.wait<dynamic>([
         _client
             .from('users')
-            .select('id, display_name, experience_level')
+            .select('id, display_name, avatar_url, experience_level')
             .eq('id', profileId)
             .single(),
         _client
@@ -42,6 +42,7 @@ class ProfileService {
       return EditableProfile(
         id: profile['id'] as String,
         displayName: profile['display_name'] as String,
+        avatarUrl: profile['avatar_url'] as String?,
         experienceLevel: profile['experience_level'] as String?,
         purposes: _stringValues(results[1], 'purpose'),
         partIds: _stringValues(results[2], 'part_id'),
