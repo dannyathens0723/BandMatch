@@ -43,10 +43,17 @@ class ChatRoomMessageService {
     required String roomId,
     required String body,
   }) async {
+    final trimmedBody = body.trim();
+    final hasSession = _client.auth.currentSession != null;
+    debugPrint(
+      'Chat message send requested: roomId=$roomId, '
+      'trimmedBodyLength=${trimmedBody.length}, hasSession=$hasSession',
+    );
+
     try {
       final rows = await _client.rpc(
         'send_room_message',
-        params: {'p_room_id': roomId, 'p_body': body.trim()},
+        params: {'p_room_id': roomId, 'p_body': trimmedBody},
       );
       if (rows is! List || rows.length != 1 || rows.first is! Map) {
         throw StateError('メッセージを送信できませんでした。');
@@ -59,6 +66,13 @@ class ChatRoomMessageService {
         'Chat message send failed: '
         'message=${error.message}, code=${error.code}, '
         'details=${error.details}, hint=${error.hint}\n$stackTrace',
+      );
+      rethrow;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Chat message send failed (non-Postgrest): '
+        'roomId=$roomId, trimmedBodyLength=${trimmedBody.length}, '
+        'hasSession=$hasSession, error=$error\n$stackTrace',
       );
       rethrow;
     }
