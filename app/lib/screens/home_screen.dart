@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/master_data_item.dart';
+import 'chat_rooms_screen.dart';
 import 'member_list_screen.dart';
 import 'received_message_requests_screen.dart';
 import '../services/master_data_service.dart';
@@ -86,6 +87,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             icon: const Icon(Icons.people_outline),
           ),
+          IconButton(
+            tooltip: 'メッセージ',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ChatRoomsScreen()),
+            ),
+            icon: const Icon(Icons.forum_outlined),
+          ),
           _MessageRequestInboxButton(
             hasPendingRequests: _pendingRequestCount > 0,
             onPressed: _openReceivedRequests,
@@ -142,6 +150,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         icon: const Icon(Icons.people_outline),
                         label: const Text('メンバーを探す'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const ChatRoomsScreen(),
+                          ),
+                        ),
+                        icon: const Icon(Icons.forum_outlined),
+                        label: const Text('メッセージ'),
                       ),
                       const SizedBox(height: 28),
                       LayoutBuilder(
