@@ -19,7 +19,10 @@ class ChatRoomScreen extends StatefulWidget {
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _service = ChatRoomMessageService();
+  final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
   late Future<_ChatRoomData> _roomData;
+  bool _isSending = false;
 
   @override
   void initState() {
@@ -39,6 +42,78 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   void _reload() => setState(() => _roomData = _loadRoomData());
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (_isSending) return;
+
+    final body = _messageController.text.trim();
+    if (body.isEmpty || body.length > 1000) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('メッセージは1〜1000文字で入力してください。')));
+      return;
+    }
+
+    setState(() => _isSending = true);
+    try {
+      final sentMessage = await _service.sendMessage(
+        roomId: widget.roomId,
+        body: body,
+      );
+      if (!mounted) return;
+
+      _messageController.clear();
+      await _appendSentMessage(sentMessage);
+    } catch (error, stackTrace) {
+      debugPrint('Chat message send flow failed: $error\n$stackTrace');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('メッセージを送信できませんでした。時間をおいて再度お試しください。')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  Future<void> _appendSentMessage(ChatRoomMessage sentMessage) async {
+    try {
+      final data = await _roomData;
+      if (!mounted) return;
+
+      final messages = [...data.messages];
+      if (!messages.any(
+        (message) => message.messageId == sentMessage.messageId,
+      )) {
+        messages.add(sentMessage);
+      }
+      setState(
+        () => _roomData = Future.value(
+          _ChatRoomData(messages: messages, currentUserId: data.currentUserId),
+        ),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Chat message was sent but could not be appended to the UI: '
+        '$error\n$stackTrace',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,6 +153,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 900),
                       child: ListView.separated(
+                        controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
                         itemCount: data.messages.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -94,7 +170,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 },
               ),
             ),
-            const _SendingPlaceholder(),
+            _MessageComposer(
+              controller: _messageController,
+              isSending: _isSending,
+              onSend: _send,
+            ),
           ],
         ),
       ),
@@ -154,8 +234,16 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _SendingPlaceholder extends StatelessWidget {
-  const _SendingPlaceholder();
+class _MessageComposer extends StatelessWidget {
+  const _MessageComposer({
+    required this.controller,
+    required this.isSending,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final bool isSending;
+  final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
@@ -165,13 +253,40 @@ class _SendingPlaceholder extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: null,
-              icon: const Icon(Icons.send_outlined),
-              label: const Text('メッセージ送信は次のステップで実装します'),
-            ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  enabled: !isSending,
+                  minLines: 1,
+                  maxLines: 4,
+                  maxLength: 1000,
+                  decoration: const InputDecoration(
+                    hintText: 'メッセージを入力',
+                    border: OutlineInputBorder(),
+                    counterText: '',
+                  ),
+                  onSubmitted: (_) => onSend(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton(
+                onPressed: isSending ? null : onSend,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(52, 52),
+                  padding: EdgeInsets.zero,
+                ),
+                child: isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_outlined),
+              ),
+            ],
           ),
         ),
       ),

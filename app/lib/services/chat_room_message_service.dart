@@ -39,6 +39,31 @@ class ChatRoomMessageService {
     }
   }
 
+  Future<ChatRoomMessage> sendMessage({
+    required String roomId,
+    required String body,
+  }) async {
+    try {
+      final rows = await _client.rpc(
+        'send_room_message',
+        params: {'p_room_id': roomId, 'p_body': body.trim()},
+      );
+      if (rows is! List || rows.length != 1 || rows.first is! Map) {
+        throw StateError('メッセージを送信できませんでした。');
+      }
+      return ChatRoomMessage.fromJson(
+        Map<String, dynamic>.from(rows.first as Map),
+      );
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        'Chat message send failed: '
+        'message=${error.message}, code=${error.code}, '
+        'details=${error.details}, hint=${error.hint}\n$stackTrace',
+      );
+      rethrow;
+    }
+  }
+
   Future<String> fetchCurrentProfileId() async {
     final authUser = _client.auth.currentUser;
     if (authUser == null) throw StateError('サインインが必要です。');

@@ -5,7 +5,7 @@ class ChatRoomMessage {
     required this.senderUserId,
     required this.body,
     required this.createdAt,
-    required this.updatedAt,
+    this.updatedAt,
   });
 
   final String messageId;
@@ -13,7 +13,7 @@ class ChatRoomMessage {
   final String senderUserId;
   final String body;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
 
   factory ChatRoomMessage.fromJson(Map<String, dynamic> json) {
     return ChatRoomMessage(
@@ -22,7 +22,9 @@ class ChatRoomMessage {
       senderUserId: json['sender_user_id'] as String,
       body: json['body'] as String,
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
-      updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+      updatedAt: json['updated_at'] == null
+          ? null
+          : DateTime.parse(json['updated_at'] as String).toLocal(),
     );
   }
 }
