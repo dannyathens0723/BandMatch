@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/my_page_profile.dart';
 import '../services/my_page_service.dart';
+import 'my_groups_screen.dart';
 import 'profile_edit_screen.dart';
 
 class MyPageScreen extends StatefulWidget {
@@ -75,9 +76,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
     if (!refreshed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('マイページを更新できませんでした。時間をおいて再度お試しください。'),
-        ),
+        const SnackBar(content: Text('マイページを更新できませんでした。時間をおいて再度お試しください。')),
       );
       return;
     }
@@ -87,6 +86,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text('プロフィールを更新しました')));
     }
+  }
+
+  Future<void> _openMyGroups() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MyGroupsScreen()));
   }
 
   Future<void> _signOut() async {
@@ -161,6 +166,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       _ActionCard(
                         isSigningOut: _isSigningOut,
                         onProfileEdit: _openProfileEdit,
+                        onMyGroups: _openMyGroups,
                         onSignOut: _signOut,
                         onComingSoon: _showComingSoon,
                       ),
@@ -265,12 +271,14 @@ class _ActionCard extends StatelessWidget {
   const _ActionCard({
     required this.isSigningOut,
     required this.onProfileEdit,
+    required this.onMyGroups,
     required this.onSignOut,
     required this.onComingSoon,
   });
 
   final bool isSigningOut;
   final VoidCallback onProfileEdit;
+  final VoidCallback onMyGroups;
   final VoidCallback onSignOut;
   final void Function(String title) onComingSoon;
 
@@ -286,6 +294,13 @@ class _ActionCard extends StatelessWidget {
               title: const Text('プロフィール編集'),
               trailing: const Icon(Icons.chevron_right),
               onTap: onProfileEdit,
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.groups_outlined),
+              title: const Text('バンド・グループ'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: onMyGroups,
             ),
             const Divider(height: 1),
             ListTile(
