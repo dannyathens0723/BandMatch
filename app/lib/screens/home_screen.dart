@@ -7,6 +7,7 @@ import '../widgets/master_data_section.dart';
 import 'chat_rooms_screen.dart';
 import 'member_list_screen.dart';
 import 'my_page_screen.dart';
+import 'public_recruitment_posts_screen.dart';
 import 'received_message_requests_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -58,6 +59,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const MemberListScreen()));
+  }
+
+  void _openPublicRecruitmentPosts() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PublicRecruitmentPostsScreen(),
+      ),
+    );
   }
 
   void _openChatRooms() {
@@ -139,6 +148,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         onPressed: _openMemberList,
                         icon: const Icon(Icons.people_outline),
                         label: const Text('メンバーを探す'),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.tonalIcon(
+                        onPressed: _openPublicRecruitmentPosts,
+                        icon: const Icon(Icons.campaign_outlined),
+                        label: const Text('募集を探す'),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(

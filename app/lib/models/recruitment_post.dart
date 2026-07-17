@@ -97,3 +97,44 @@ class RecruitmentPostEditData {
     };
   }
 }
+
+class PublicRecruitmentPost {
+  const PublicRecruitmentPost({
+    required this.postId,
+    required this.groupId,
+    required this.groupName,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.wantedPartNames,
+    required this.genreNames,
+    required this.areaNames,
+  });
+
+  final String postId;
+  final String groupId;
+  final String groupName;
+  final String title;
+  final String body;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<String> wantedPartNames;
+  final List<String> genreNames;
+  final List<String> areaNames;
+
+  factory PublicRecruitmentPost.fromJson(Map<String, dynamic> json) {
+    return PublicRecruitmentPost(
+      postId: json['post_id'] as String,
+      groupId: json['group_id'] as String,
+      groupName: json['group_name'] as String,
+      title: json['title'] as String,
+      body: json['body'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
+      wantedPartNames: RecruitmentPost._stringList(json['wanted_part_names']),
+      genreNames: RecruitmentPost._stringList(json['genre_names']),
+      areaNames: RecruitmentPost._stringList(json['area_names']),
+    );
+  }
+}
