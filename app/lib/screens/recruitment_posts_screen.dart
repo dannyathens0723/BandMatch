@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/my_group_profile.dart';
 import '../models/recruitment_post.dart';
 import '../services/recruitment_post_service.dart';
+import 'recruitment_applications_screen.dart';
 import 'recruitment_post_edit_screen.dart';
 
 class RecruitmentPostsScreen extends StatefulWidget {
@@ -81,6 +82,14 @@ class _RecruitmentPostsScreenState extends State<RecruitmentPostsScreen> {
     }
   }
 
+  void _openApplications() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => RecruitmentApplicationsScreen(group: widget.group),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -99,6 +108,11 @@ class _RecruitmentPostsScreenState extends State<RecruitmentPostsScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: '応募一覧',
+            onPressed: _openApplications,
+            icon: const Icon(Icons.assignment_ind_outlined),
           ),
           const SizedBox(width: 12),
         ],
