@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/my_group_profile.dart';
 import '../services/group_profile_service.dart';
+import 'group_members_screen.dart';
 import 'group_edit_screen.dart';
 import 'recruitment_posts_screen.dart';
 
@@ -86,6 +87,12 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
     );
   }
 
+  Future<void> _openMembers(MyGroupProfile group) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => GroupMembersScreen(group: group)),
+    );
+  }
+
   void _openGroup(MyGroupProfile group) {
     if (group.isAdmin) {
       _openEdit(group);
@@ -167,6 +174,7 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
                           child: _GroupCard(
                             group: group,
                             onTap: () => _openGroup(group),
+                            onMembers: () => _openMembers(group),
                             onRecruitmentPosts: () =>
                                 _openRecruitmentPosts(group),
                           ),
@@ -182,6 +190,7 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
                           child: _GroupCard(
                             group: group,
                             onTap: () => _openGroup(group),
+                            onMembers: () => _openMembers(group),
                             onRecruitmentPosts: () =>
                                 _openRecruitmentPosts(group),
                           ),
@@ -203,11 +212,13 @@ class _GroupCard extends StatelessWidget {
   const _GroupCard({
     required this.group,
     required this.onTap,
+    required this.onMembers,
     required this.onRecruitmentPosts,
   });
 
   final MyGroupProfile group;
   final VoidCallback onTap;
+  final VoidCallback onMembers;
   final VoidCallback onRecruitmentPosts;
 
   @override
@@ -262,22 +273,24 @@ class _GroupCard extends StatelessWidget {
               ),
               if (group.isAdmin) ...[
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onTap,
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('編集'),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: onTap,
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('編集'),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: onRecruitmentPosts,
-                        icon: const Icon(Icons.campaign_outlined),
-                        label: const Text('募集投稿'),
-                      ),
+                    FilledButton.tonalIcon(
+                      onPressed: onMembers,
+                      icon: const Icon(Icons.groups_outlined),
+                      label: const Text('メンバー'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: onRecruitmentPosts,
+                      icon: const Icon(Icons.campaign_outlined),
+                      label: const Text('募集投稿'),
                     ),
                   ],
                 ),
@@ -286,6 +299,12 @@ class _GroupCard extends StatelessWidget {
                 Text(
                   'メンバーとして参加中です。編集や募集管理は管理者のみ利用できます。',
                   style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: onMembers,
+                  icon: const Icon(Icons.groups_outlined),
+                  label: const Text('メンバー'),
                 ),
               ],
             ],
