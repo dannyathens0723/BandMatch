@@ -68,12 +68,33 @@ class _PublicRecruitmentPostDetailScreenState
       ).showSnackBar(const SnackBar(content: Text('応募しました')));
     } catch (_) {
       if (!mounted) return;
+      final recoveredState = await _recoverApplicationStateAfterSubmitError();
+      if (!mounted) return;
+      if (recoveredState != null && !recoveredState.canApply) {
+        setState(() => _applicationState = Future.value(recoveredState));
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('応募できませんでした。時間をおいて再度お試しください。')),
       );
       _reloadApplicationState();
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<RecruitmentApplicationState?>
+  _recoverApplicationStateAfterSubmitError() async {
+    try {
+      return await _applicationService.fetchMyApplicationState(
+        widget.post.postId,
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Recruitment application submit failed and state recovery also failed: '
+        '$error\n$stackTrace',
+      );
+      return null;
     }
   }
 

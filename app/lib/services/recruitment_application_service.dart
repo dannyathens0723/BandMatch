@@ -13,20 +13,22 @@ class RecruitmentApplicationService {
     String postId,
   ) async {
     try {
-      final rows = await _client.rpc(
+      final response = await _client.rpc(
         'get_my_recruitment_application_state',
         params: {'p_post_id': postId},
       );
-      final list = rows as List<dynamic>;
-      if (list.isEmpty) {
+      final row = _firstRow(response);
+      if (row == null) {
+        debugPrint(
+          'Recruitment application state response was empty or unexpected: '
+          '${response.runtimeType} $response',
+        );
         return const RecruitmentApplicationState(
           state: 'none',
           applicationId: null,
         );
       }
-      return RecruitmentApplicationState.fromJson(
-        list.first as Map<String, dynamic>,
-      );
+      return RecruitmentApplicationState.fromJson(row);
     } on PostgrestException catch (error, stackTrace) {
       _logPostgrestException(
         'Recruitment application state load failed',
@@ -41,19 +43,11 @@ class RecruitmentApplicationService {
     required String postId,
     required String message,
   }) async {
+    dynamic response;
     try {
-      final rows = await _client.rpc(
+      response = await _client.rpc(
         'apply_to_recruitment_post',
         params: {'p_post_id': postId, 'p_message': message},
-      );
-      final list = rows as List<dynamic>;
-      if (list.isEmpty) {
-        throw StateError('empty application response');
-      }
-      final row = list.first as Map<String, dynamic>;
-      return RecruitmentApplicationState(
-        state: row['status'] as String? ?? 'pending',
-        applicationId: row['application_id'] as String?,
       );
     } on PostgrestException catch (error, stackTrace) {
       _logPostgrestException(
@@ -63,6 +57,23 @@ class RecruitmentApplicationService {
       );
       rethrow;
     }
+
+    final row = _firstRow(response);
+    if (row == null) {
+      debugPrint(
+        'Recruitment application submit succeeded but returned an unexpected '
+        'response shape: ${response.runtimeType} $response',
+      );
+      return const RecruitmentApplicationState(
+        state: 'pending',
+        applicationId: null,
+      );
+    }
+
+    return RecruitmentApplicationState(
+      state: row['status'] as String? ?? 'pending',
+      applicationId: row['application_id'] as String?,
+    );
   }
 
   Future<List<RecruitmentApplication>> fetchGroupApplications(
@@ -131,5 +142,24 @@ class RecruitmentApplicationService {
       'details=${error.details}, hint=${error.hint}',
     );
     debugPrintStack(stackTrace: stackTrace);
+  }
+
+  Map<String, dynamic>? _firstRow(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      return response;
+    }
+    if (response is Map) {
+      return Map<String, dynamic>.from(response);
+    }
+    if (response is List && response.isNotEmpty) {
+      final first = response.first;
+      if (first is Map<String, dynamic>) {
+        return first;
+      }
+      if (first is Map) {
+        return Map<String, dynamic>.from(first);
+      }
+    }
+    return null;
   }
 }
