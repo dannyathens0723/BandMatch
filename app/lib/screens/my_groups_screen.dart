@@ -75,11 +75,29 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
   }
 
   Future<void> _openRecruitmentPosts(MyGroupProfile group) async {
+    if (!group.isAdmin) {
+      _showMemberGroupPlaceholder();
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => RecruitmentPostsScreen(group: group),
       ),
     );
+  }
+
+  void _openGroup(MyGroupProfile group) {
+    if (group.isAdmin) {
+      _openEdit(group);
+      return;
+    }
+    _showMemberGroupPlaceholder();
+  }
+
+  void _showMemberGroupPlaceholder() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('グループ詳細は今後拡張予定です')));
   }
 
   @override
@@ -128,21 +146,49 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
               return _EmptyGroups(onCreate: _openCreate);
             }
 
+            final adminGroups = groups
+                .where((group) => group.isAdmin)
+                .toList(growable: false);
+            final memberGroups = groups
+                .where((group) => !group.isAdmin)
+                .toList(growable: false);
+
             return Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 760),
-                child: ListView.separated(
+                child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
-                  itemCount: groups.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final group = groups[index];
-                    return _GroupCard(
-                      group: group,
-                      onTap: () => _openEdit(group),
-                      onRecruitmentPosts: () => _openRecruitmentPosts(group),
-                    );
-                  },
+                  children: [
+                    if (adminGroups.isNotEmpty) ...[
+                      const _GroupSectionHeader(title: '管理しているグループ'),
+                      ...adminGroups.map(
+                        (group) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _GroupCard(
+                            group: group,
+                            onTap: () => _openGroup(group),
+                            onRecruitmentPosts: () =>
+                                _openRecruitmentPosts(group),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (memberGroups.isNotEmpty) ...[
+                      if (adminGroups.isNotEmpty) const SizedBox(height: 12),
+                      const _GroupSectionHeader(title: '参加中のグループ'),
+                      ...memberGroups.map(
+                        (group) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _GroupCard(
+                            group: group,
+                            onTap: () => _openGroup(group),
+                            onRecruitmentPosts: () =>
+                                _openRecruitmentPosts(group),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             );
@@ -197,6 +243,9 @@ class _GroupCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Chip(label: Text(group.isAdmin ? '管理' : 'メンバー')),
+                  const SizedBox(width: 4),
                   const Icon(Icons.chevron_right),
                 ],
               ),
@@ -211,26 +260,34 @@ class _GroupCard extends StatelessWidget {
                 label: '募集パート',
                 values: group.recruitingPartNames,
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onTap,
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('編集'),
+              if (group.isAdmin) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onTap,
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('編集'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: onRecruitmentPosts,
-                      icon: const Icon(Icons.campaign_outlined),
-                      label: const Text('募集投稿'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: onRecruitmentPosts,
+                        icon: const Icon(Icons.campaign_outlined),
+                        label: const Text('募集投稿'),
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ] else ...[
+                const SizedBox(height: 8),
+                Text(
+                  'メンバーとして参加中です。編集や募集管理は管理者のみ利用できます。',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
             ],
           ),
         ),
@@ -244,6 +301,20 @@ class _GroupCard extends StatelessWidget {
     final month = value.month.toString().padLeft(2, '0');
     final day = value.day.toString().padLeft(2, '0');
     return '$month/$day';
+  }
+}
+
+class _GroupSectionHeader extends StatelessWidget {
+  const _GroupSectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+    );
   }
 }
 

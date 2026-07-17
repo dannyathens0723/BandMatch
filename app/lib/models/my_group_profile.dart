@@ -6,6 +6,7 @@ class MyGroupProfile {
     required this.bio,
     required this.activityFrequency,
     required this.accountStatus,
+    required this.membershipRole,
     required this.createdAt,
     required this.updatedAt,
     required this.genreIds,
@@ -22,6 +23,7 @@ class MyGroupProfile {
   final String? bio;
   final String? activityFrequency;
   final String accountStatus;
+  final String membershipRole;
   final DateTime createdAt;
   final DateTime updatedAt;
   final Set<String> genreIds;
@@ -31,6 +33,8 @@ class MyGroupProfile {
   final Set<String> areaIds;
   final List<String> areaNames;
 
+  bool get isAdmin => membershipRole == 'admin';
+
   factory MyGroupProfile.fromJson(Map<String, dynamic> json) {
     return MyGroupProfile(
       id: json['id'] as String,
@@ -39,6 +43,7 @@ class MyGroupProfile {
       bio: json['bio'] as String?,
       activityFrequency: json['activity_frequency'] as String?,
       accountStatus: json['account_status'] as String,
+      membershipRole: json['membership_role'] as String? ?? 'admin',
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
       updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
       genreIds: _stringSet(json['genre_ids']),
