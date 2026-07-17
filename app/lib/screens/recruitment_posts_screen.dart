@@ -1,43 +1,45 @@
 import 'package:flutter/material.dart';
 
 import '../models/my_group_profile.dart';
-import '../services/group_profile_service.dart';
-import 'group_edit_screen.dart';
-import 'recruitment_posts_screen.dart';
+import '../models/recruitment_post.dart';
+import '../services/recruitment_post_service.dart';
+import 'recruitment_post_edit_screen.dart';
 
-class MyGroupsScreen extends StatefulWidget {
-  const MyGroupsScreen({super.key});
+class RecruitmentPostsScreen extends StatefulWidget {
+  const RecruitmentPostsScreen({super.key, required this.group});
+
+  final MyGroupProfile group;
 
   @override
-  State<MyGroupsScreen> createState() => _MyGroupsScreenState();
+  State<RecruitmentPostsScreen> createState() => _RecruitmentPostsScreenState();
 }
 
-class _MyGroupsScreenState extends State<MyGroupsScreen> {
-  final _service = GroupProfileService();
-  late Future<List<MyGroupProfile>> _groups;
+class _RecruitmentPostsScreenState extends State<RecruitmentPostsScreen> {
+  final _service = RecruitmentPostService();
+  late Future<List<RecruitmentPost>> _posts;
   bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _groups = _service.fetchMyGroups();
+    _posts = _service.fetchMyGroupPosts(widget.group.id);
   }
 
   Future<bool> _reload({bool showErrorSnackBar = false}) async {
-    final nextGroups = _service.fetchMyGroups();
+    final nextPosts = _service.fetchMyGroupPosts(widget.group.id);
     setState(() {
-      _groups = nextGroups;
+      _posts = nextPosts;
       _isRefreshing = true;
     });
 
     try {
-      await nextGroups;
+      await nextPosts;
       return true;
     } catch (error, stackTrace) {
-      debugPrint('My groups refresh failed: $error\n$stackTrace');
+      debugPrint('Recruitment posts refresh failed: $error\n$stackTrace');
       if (mounted && showErrorSnackBar) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('グループ一覧を更新できませんでした。時間をおいて再度お試しください。')),
+          const SnackBar(content: Text('募集投稿一覧を更新できませんでした。時間をおいて再度お試しください。')),
         );
       }
       return false;
@@ -48,7 +50,9 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
 
   Future<void> _openCreate() async {
     final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(builder: (_) => const GroupEditScreen()),
+      MaterialPageRoute<String>(
+        builder: (_) => RecruitmentPostEditScreen(group: widget.group),
+      ),
     );
     if (!mounted) return;
     if (result == 'created') {
@@ -56,13 +60,16 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
       if (!mounted || !refreshed) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('グループを作成しました')));
+      ).showSnackBar(const SnackBar(content: Text('募集投稿を作成しました')));
     }
   }
 
-  Future<void> _openEdit(MyGroupProfile group) async {
+  Future<void> _openEdit(RecruitmentPost post) async {
     final result = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(builder: (_) => GroupEditScreen(group: group)),
+      MaterialPageRoute<String>(
+        builder: (_) =>
+            RecruitmentPostEditScreen(group: widget.group, post: post),
+      ),
     );
     if (!mounted) return;
     if (result == 'updated') {
@@ -70,23 +77,15 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
       if (!mounted || !refreshed) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('グループを更新しました')));
+      ).showSnackBar(const SnackBar(content: Text('募集投稿を更新しました')));
     }
-  }
-
-  Future<void> _openRecruitmentPosts(MyGroupProfile group) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => RecruitmentPostsScreen(group: group),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('バンド・グループ'),
+        title: const Text('募集投稿'),
         actions: [
           IconButton(
             tooltip: '再読み込み',
@@ -107,25 +106,25 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCreate,
         icon: const Icon(Icons.add),
-        label: const Text('グループを作成'),
+        label: const Text('募集を作成'),
       ),
       body: SafeArea(
         top: false,
-        child: FutureBuilder<List<MyGroupProfile>>(
-          future: _groups,
+        child: FutureBuilder<List<RecruitmentPost>>(
+          future: _posts,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return _MyGroupsError(
+              return _RecruitmentPostsError(
                 onRetry: () => _reload(showErrorSnackBar: true),
               );
             }
 
-            final groups = snapshot.requireData;
-            if (groups.isEmpty) {
-              return _EmptyGroups(onCreate: _openCreate);
+            final posts = snapshot.requireData;
+            if (posts.isEmpty) {
+              return _EmptyRecruitmentPosts(onCreate: _openCreate);
             }
 
             return Center(
@@ -133,14 +132,13 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
                 constraints: const BoxConstraints(maxWidth: 760),
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
-                  itemCount: groups.length,
+                  itemCount: posts.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
-                    final group = groups[index];
-                    return _GroupCard(
-                      group: group,
-                      onTap: () => _openEdit(group),
-                      onRecruitmentPosts: () => _openRecruitmentPosts(group),
+                    final post = posts[index];
+                    return _RecruitmentPostCard(
+                      post: post,
+                      onTap: () => _openEdit(post),
                     );
                   },
                 ),
@@ -153,16 +151,11 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
   }
 }
 
-class _GroupCard extends StatelessWidget {
-  const _GroupCard({
-    required this.group,
-    required this.onTap,
-    required this.onRecruitmentPosts,
-  });
+class _RecruitmentPostCard extends StatelessWidget {
+  const _RecruitmentPostCard({required this.post, required this.onTap});
 
-  final MyGroupProfile group;
+  final RecruitmentPost post;
   final VoidCallback onTap;
-  final VoidCallback onRecruitmentPosts;
 
   @override
   Widget build(BuildContext context) {
@@ -178,59 +171,24 @@ class _GroupCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: const Color(0xFFFFF3CA),
-                    child: Text(group.name.characters.first),
-                  ),
-                  const SizedBox(width: 14),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(group.name, style: theme.textTheme.titleLarge),
-                        const SizedBox(height: 4),
-                        Text(
-                          '更新: ${_formatDate(group.updatedAt)}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-              if (_hasText(group.bio)) ...[
-                const SizedBox(height: 16),
-                Text(group.bio!),
-              ],
-              const SizedBox(height: 16),
-              _GroupSummaryChips(label: '活動エリア', values: group.areaNames),
-              _GroupSummaryChips(label: 'ジャンル', values: group.genreNames),
-              _GroupSummaryChips(
-                label: '募集パート',
-                values: group.recruitingPartNames,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onTap,
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('編集'),
-                    ),
+                    child: Text(post.title, style: theme.textTheme.titleLarge),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: onRecruitmentPosts,
-                      icon: const Icon(Icons.campaign_outlined),
-                      label: const Text('募集投稿'),
-                    ),
-                  ),
+                  Chip(label: Text(_statusLabel(post.status))),
                 ],
               ),
+              const SizedBox(height: 8),
+              Text(
+                '更新: ${_formatDate(post.updatedAt)}',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 14),
+              Text(post.body, maxLines: 3, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 16),
+              _PostSummaryChips(label: '募集パート', values: post.wantedPartNames),
+              _PostSummaryChips(label: 'ジャンル', values: post.genreNames),
+              _PostSummaryChips(label: '活動エリア', values: post.areaNames),
             ],
           ),
         ),
@@ -238,7 +196,14 @@ class _GroupCard extends StatelessWidget {
     );
   }
 
-  bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
+  String _statusLabel(String status) {
+    return switch (status) {
+      'draft' => '下書き',
+      'open' => '公開中',
+      'closed' => '終了',
+      _ => status,
+    };
+  }
 
   String _formatDate(DateTime value) {
     final month = value.month.toString().padLeft(2, '0');
@@ -247,8 +212,8 @@ class _GroupCard extends StatelessWidget {
   }
 }
 
-class _GroupSummaryChips extends StatelessWidget {
-  const _GroupSummaryChips({required this.label, required this.values});
+class _PostSummaryChips extends StatelessWidget {
+  const _PostSummaryChips({required this.label, required this.values});
 
   final String label;
   final List<String> values;
@@ -274,8 +239,8 @@ class _GroupSummaryChips extends StatelessWidget {
   }
 }
 
-class _EmptyGroups extends StatelessWidget {
-  const _EmptyGroups({required this.onCreate});
+class _EmptyRecruitmentPosts extends StatelessWidget {
+  const _EmptyRecruitmentPosts({required this.onCreate});
 
   final VoidCallback onCreate;
 
@@ -289,23 +254,23 @@ class _EmptyGroups extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.groups_outlined, size: 48),
+              const Icon(Icons.campaign_outlined, size: 48),
               const SizedBox(height: 16),
               Text(
-                'バンド・グループはまだありません',
+                '募集投稿はまだありません',
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               const Text(
-                '一緒に活動するメンバーを探すために、まずはグループを作成しましょう。',
+                '必要なパートや活動内容を投稿して、メンバーを探しましょう。',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
                 onPressed: onCreate,
                 icon: const Icon(Icons.add),
-                label: const Text('グループを作成'),
+                label: const Text('募集を作成'),
               ),
             ],
           ),
@@ -315,8 +280,8 @@ class _EmptyGroups extends StatelessWidget {
   }
 }
 
-class _MyGroupsError extends StatelessWidget {
-  const _MyGroupsError({required this.onRetry});
+class _RecruitmentPostsError extends StatelessWidget {
+  const _RecruitmentPostsError({required this.onRetry});
 
   final VoidCallback onRetry;
 
@@ -332,7 +297,7 @@ class _MyGroupsError extends StatelessWidget {
             children: [
               const Icon(Icons.cloud_off_outlined, size: 44),
               const SizedBox(height: 16),
-              const Text('バンド・グループを読み込めませんでした。時間をおいて再度お試しください。'),
+              const Text('募集投稿を読み込めませんでした。時間をおいて再度お試しください。'),
               const SizedBox(height: 16),
               FilledButton(onPressed: onRetry, child: const Text('再読み込み')),
             ],
