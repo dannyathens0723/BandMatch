@@ -16,7 +16,9 @@ class GroupMembersScreen extends StatefulWidget {
 class _GroupMembersScreenState extends State<GroupMembersScreen> {
   final _service = GroupMemberService();
   late Future<List<GroupMember>> _members;
+  final _removingMemberIds = <String>{};
   bool _isRefreshing = false;
+  bool _isLeaving = false;
 
   @override
   void initState() {
@@ -42,6 +44,92 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
       }
     } finally {
       if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  Future<void> _confirmLeaveGroup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('グループを退会しますか？'),
+        content: const Text('退会すると、このグループはマイページに表示されなくなります。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('退会する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _leaveGroup();
+    }
+  }
+
+  Future<void> _leaveGroup() async {
+    if (_isLeaving) return;
+    setState(() => _isLeaving = true);
+    try {
+      await _service.leaveGroup(widget.group.id);
+      if (!mounted) return;
+      Navigator.of(context).pop('left');
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('グループを退会できませんでした。時間をおいて再度お試しください。')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLeaving = false);
+    }
+  }
+
+  Future<void> _confirmRemoveMember(GroupMember member) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('メンバーから外しますか？'),
+        content: Text('${member.displayName}さんはグループにアクセスできなくなります。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('外す'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _removeMember(member);
+    }
+  }
+
+  Future<void> _removeMember(GroupMember member) async {
+    if (_removingMemberIds.contains(member.userId)) return;
+    setState(() => _removingMemberIds.add(member.userId));
+    try {
+      await _service.removeGroupMember(
+        groupId: widget.group.id,
+        memberUserId: member.userId,
+      );
+      await _reload(showErrorSnackBar: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('メンバーを外しました')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('メンバーを外せませんでした。時間をおいて再度お試しください。')),
+      );
+    } finally {
+      if (mounted) setState(() => _removingMemberIds.remove(member.userId));
     }
   }
 
@@ -97,10 +185,21 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                       : const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     if (index == 0) {
-                      return _GroupHeader(group: widget.group);
+                      return _GroupHeader(
+                        group: widget.group,
+                        isLeaving: _isLeaving,
+                        onLeave: widget.group.isAdmin
+                            ? null
+                            : _confirmLeaveGroup,
+                      );
                     }
                     final member = members[index - 1];
-                    return _GroupMemberCard(member: member);
+                    return _GroupMemberCard(
+                      member: member,
+                      canRemove: widget.group.isAdmin && !member.isAdmin,
+                      isRemoving: _removingMemberIds.contains(member.userId),
+                      onRemove: () => _confirmRemoveMember(member),
+                    );
                   },
                 ),
               ),
@@ -113,36 +212,64 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 }
 
 class _GroupHeader extends StatelessWidget {
-  const _GroupHeader({required this.group});
+  const _GroupHeader({
+    required this.group,
+    required this.isLeaving,
+    required this.onLeave,
+  });
 
   final MyGroupProfile group;
+  final bool isLeaving;
+  final VoidCallback? onLeave;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const CircleAvatar(
-              radius: 24,
-              backgroundColor: Color(0xFFFFF3CA),
-              child: Icon(Icons.groups_outlined),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    group.name,
-                    style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Color(0xFFFFF3CA),
+                  child: Icon(Icons.groups_outlined),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        group.name,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('このグループの参加メンバー'),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  const Text('このグループの参加メンバー'),
-                ],
-              ),
+                ),
+              ],
             ),
+            if (onLeave != null) ...[
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: isLeaving ? null : onLeave,
+                  icon: isLeaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.logout_outlined),
+                  label: Text(isLeaving ? '退会中...' : 'グループを退会する'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -151,9 +278,17 @@ class _GroupHeader extends StatelessWidget {
 }
 
 class _GroupMemberCard extends StatelessWidget {
-  const _GroupMemberCard({required this.member});
+  const _GroupMemberCard({
+    required this.member,
+    required this.canRemove,
+    required this.isRemoving,
+    required this.onRemove,
+  });
 
   final GroupMember member;
+  final bool canRemove;
+  final bool isRemoving;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +338,23 @@ class _GroupMemberCard extends StatelessWidget {
             const SizedBox(height: 14),
             _MemberSummaryChips(label: 'パート', values: member.partNames),
             _MemberSummaryChips(label: 'ジャンル', values: member.genreNames),
+            if (canRemove) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: isRemoving ? null : onRemove,
+                  icon: isRemoving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.person_remove_outlined),
+                  label: Text(isRemoving ? '処理中...' : 'メンバーから外す'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -27,4 +27,36 @@ class GroupMemberService {
       rethrow;
     }
   }
+
+  Future<void> leaveGroup(String groupId) async {
+    try {
+      await _client.rpc('leave_group', params: {'p_group_id': groupId});
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        'Group leave failed: message=${error.message}, '
+        'code=${error.code}, details=${error.details}, hint=${error.hint}',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<void> removeGroupMember({
+    required String groupId,
+    required String memberUserId,
+  }) async {
+    try {
+      await _client.rpc(
+        'remove_group_member',
+        params: {'p_group_id': groupId, 'p_member_user_id': memberUserId},
+      );
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        'Group member removal failed: message=${error.message}, '
+        'code=${error.code}, details=${error.details}, hint=${error.hint}',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
 }

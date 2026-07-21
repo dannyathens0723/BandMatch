@@ -88,9 +88,19 @@ class _MyGroupsScreenState extends State<MyGroupsScreen> {
   }
 
   Future<void> _openMembers(MyGroupProfile group) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => GroupMembersScreen(group: group)),
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => GroupMembersScreen(group: group),
+      ),
     );
+    if (!mounted) return;
+    if (result == 'left') {
+      final refreshed = await _reload(showErrorSnackBar: true);
+      if (!mounted || !refreshed) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('グループを退会しました')));
+    }
   }
 
   void _openGroup(MyGroupProfile group) {
