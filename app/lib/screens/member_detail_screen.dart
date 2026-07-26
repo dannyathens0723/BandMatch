@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../models/member_relationship.dart';
 import '../models/member_profile.dart';
+import '../models/user_safety_state.dart';
 import '../services/member_search_service.dart';
 import '../services/message_request_service.dart';
+import '../services/user_safety_service.dart';
 import '../widgets/message_request_sheet.dart';
+import '../widgets/user_report_dialog.dart';
 import 'chat_room_screen.dart';
 import 'received_message_requests_screen.dart';
 
@@ -20,16 +23,22 @@ class MemberDetailScreen extends StatefulWidget {
 class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final _memberSearchService = MemberSearchService();
   final _messageRequestService = MessageRequestService();
+  final _userSafetyService = UserSafetyService();
   late Future<MemberProfile?> _member;
   bool _isRequestStateLoading = true;
   MemberRelationship? _relationship;
   String? _requestStateError;
+  bool _isSafetyStateLoading = true;
+  UserSafetyState? _safetyState;
+  String? _safetyStateError;
+  bool _isBlockActionRunning = false;
 
   @override
   void initState() {
     super.initState();
     _member = _memberSearchService.fetchMemberDetail(widget.memberId);
     _loadRequestState();
+    _loadSafetyState();
   }
 
   void _reload() {
@@ -37,6 +46,25 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       () => _member = _memberSearchService.fetchMemberDetail(widget.memberId),
     );
     _loadRequestState();
+    _loadSafetyState();
+  }
+
+  Future<void> _loadSafetyState() async {
+    setState(() {
+      _isSafetyStateLoading = true;
+      _safetyStateError = null;
+      _safetyState = null;
+    });
+    try {
+      final state = await _userSafetyService.fetchState(widget.memberId);
+      if (mounted) setState(() => _safetyState = state);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _safetyStateError = '安全状態を確認できませんでした。');
+      }
+    } finally {
+      if (mounted) setState(() => _isSafetyStateLoading = false);
+    }
   }
 
   Future<void> _loadRequestState() async {
@@ -80,6 +108,93 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     ).showSnackBar(const SnackBar(content: Text('メッセージリクエストを送信しました')));
   }
 
+  Future<void> _confirmBlockUser() async {
+    if (_isBlockActionRunning) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('このユーザーをブロックしますか？'),
+        content: const Text('ブロックすると、メッセージリクエストや新しいメッセージの送信が制限されます。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('ブロックする'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _blockUser();
+  }
+
+  Future<void> _blockUser() async {
+    if (_isBlockActionRunning) return;
+    setState(() => _isBlockActionRunning = true);
+    try {
+      await _userSafetyService.blockUser(widget.memberId);
+      if (!mounted) return;
+      setState(() {
+        _safetyState = UserSafetyState.blockedByMe;
+        _safetyStateError = null;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ユーザーをブロックしました')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('操作を完了できませんでした。時間をおいて再度お試しください。')),
+      );
+    } finally {
+      if (mounted) setState(() => _isBlockActionRunning = false);
+    }
+  }
+
+  Future<void> _unblockUser() async {
+    if (_isBlockActionRunning) return;
+    setState(() => _isBlockActionRunning = true);
+    try {
+      await _userSafetyService.unblockUser(widget.memberId);
+      if (!mounted) return;
+      setState(
+        () => _member = _memberSearchService.fetchMemberDetail(widget.memberId),
+      );
+      await Future.wait([_loadSafetyState(), _loadRequestState()]);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ブロックを解除しました')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('操作を完了できませんでした。時間をおいて再度お試しください。')),
+      );
+    } finally {
+      if (mounted) setState(() => _isBlockActionRunning = false);
+    }
+  }
+
+  Future<void> _openReportDialog() async {
+    final reported = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => UserReportDialog(
+        onSubmit: (reason, note) => _userSafetyService.reportUser(
+          targetUserId: widget.memberId,
+          reason: reason,
+          note: note,
+        ),
+      ),
+    );
+    if (reported != true || !mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('通報を受け付けました')));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,6 +216,15 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (_safetyState == UserSafetyState.blockedByMe ||
+                _safetyState == UserSafetyState.blockedMe) {
+              return _RestrictedMemberDetail(
+                state: _safetyState!,
+                isBlockActionRunning: _isBlockActionRunning,
+                onUnblock: _unblockUser,
+                onReport: _openReportDialog,
+              );
             }
             if (snapshot.hasError) {
               return _DetailError(error: snapshot.error!, onRetry: _reload);
@@ -173,14 +297,28 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      _MessageRequestButton(
-                        isLoading: _isRequestStateLoading,
-                        relationship: _relationship,
-                        error: _requestStateError,
-                        onSendRequest: () => _openRequestSheet(member),
-                        onOpenInbox: _openReceivedRequests,
-                        onOpenRoom: () => _openRoom(member),
-                      ),
+                      if (_isSafetyStateLoading)
+                        const _SafetyActionsLoading()
+                      else if (_safetyStateError != null ||
+                          _safetyState == null ||
+                          _safetyState == UserSafetyState.unavailable)
+                        _SafetyStateWarning(onRetry: _loadSafetyState)
+                      else ...[
+                        _MessageRequestButton(
+                          isLoading: _isRequestStateLoading,
+                          relationship: _relationship,
+                          error: _requestStateError,
+                          onSendRequest: () => _openRequestSheet(member),
+                          onOpenInbox: _openReceivedRequests,
+                          onOpenRoom: () => _openRoom(member),
+                        ),
+                        const SizedBox(height: 16),
+                        _SafetyActionsCard(
+                          isBlockActionRunning: _isBlockActionRunning,
+                          onBlock: _confirmBlockUser,
+                          onReport: _openReportDialog,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -242,6 +380,126 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       MaterialPageRoute<void>(
         builder: (_) =>
             ChatRoomScreen(roomId: roomId, roomTitle: member.displayName),
+      ),
+    );
+  }
+}
+
+class _RestrictedMemberDetail extends StatelessWidget {
+  const _RestrictedMemberDetail({
+    required this.state,
+    required this.isBlockActionRunning,
+    required this.onUnblock,
+    required this.onReport,
+  });
+
+  final UserSafetyState state;
+  final bool isBlockActionRunning;
+  final VoidCallback onUnblock;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBlockedByMe = state == UserSafetyState.blockedByMe;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.block_outlined, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    isBlockedByMe ? 'このユーザーをブロックしています' : 'このユーザーとは現在やり取りできません',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'メッセージリクエストと新しいメッセージの送信は利用できません。',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  if (isBlockedByMe) ...[
+                    OutlinedButton.icon(
+                      onPressed: isBlockActionRunning ? null : onUnblock,
+                      icon: isBlockActionRunning
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.lock_open_outlined),
+                      label: const Text('ブロックを解除'),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  TextButton.icon(
+                    onPressed: onReport,
+                    icon: const Icon(Icons.flag_outlined),
+                    label: const Text('通報する'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SafetyActionsCard extends StatelessWidget {
+  const _SafetyActionsCard({
+    required this.isBlockActionRunning,
+    required this.onBlock,
+    required this.onReport,
+  });
+
+  final bool isBlockActionRunning;
+  final VoidCallback onBlock;
+  final VoidCallback onReport;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('安全に利用する', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: isBlockActionRunning ? null : onBlock,
+                  icon: isBlockActionRunning
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.block_outlined),
+                  label: const Text('ブロックする'),
+                ),
+                TextButton.icon(
+                  onPressed: onReport,
+                  icon: const Icon(Icons.flag_outlined),
+                  label: const Text('通報する'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -524,6 +782,60 @@ class _DetailUnavailable extends StatelessWidget {
               Text('このメンバーは表示できません'),
               SizedBox(height: 8),
               Text('プロフィールの公開状況が変わった可能性があります。'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SafetyActionsLoading extends StatelessWidget {
+  const _SafetyActionsLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(20),
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SafetyStateWarning extends StatelessWidget {
+  const _SafetyStateWarning({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.shield_outlined),
+                  SizedBox(width: 10),
+                  Expanded(child: Text('安全状態を確認できませんでした。')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text('安全確認が完了するまで、メッセージ・ブロック・通報操作は利用できません。'),
+              const SizedBox(height: 12),
+              OutlinedButton(onPressed: onRetry, child: const Text('安全状態を再確認')),
             ],
           ),
         ),

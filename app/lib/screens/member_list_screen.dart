@@ -48,6 +48,13 @@ class _MemberListScreenState extends State<MemberListScreen> {
     });
   }
 
+  void _reloadMembers() {
+    setState(
+      () =>
+          _members = _memberSearchService.fetchMembers(filters: _activeFilters),
+    );
+  }
+
   void _applyFilters() {
     final filters = MemberSearchFilters(
       partIds: Set<String>.from(_partIds),
@@ -152,7 +159,10 @@ class _MemberListScreenState extends State<MemberListScreen> {
                             isFiltered: _activeFilters.hasActiveFilters,
                           )
                         else
-                          _MemberGrid(members: members),
+                          _MemberGrid(
+                            members: members,
+                            onReturnFromDetail: _reloadMembers,
+                          ),
                       ],
                     );
                   },
@@ -351,9 +361,10 @@ class _FilterSection extends StatelessWidget {
 }
 
 class _MemberGrid extends StatelessWidget {
-  const _MemberGrid({required this.members});
+  const _MemberGrid({required this.members, required this.onReturnFromDetail});
 
   final List<MemberProfile> members;
+  final VoidCallback onReturnFromDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -377,11 +388,14 @@ class _MemberGrid extends StatelessWidget {
               height: 380,
               child: MemberCard(
                 member: member,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => MemberDetailScreen(memberId: member.id),
-                  ),
-                ),
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MemberDetailScreen(memberId: member.id),
+                    ),
+                  );
+                  if (context.mounted) onReturnFromDetail();
+                },
               ),
             );
           }).toList(),
