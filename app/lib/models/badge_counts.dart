@@ -2,14 +2,17 @@ class BadgeCounts {
   const BadgeCounts({
     required this.pendingMessageRequestCount,
     required this.pendingRecruitmentApplicationCount,
+    required this.unreadChatMessageCount,
   });
 
   const BadgeCounts.empty()
     : pendingMessageRequestCount = 0,
-      pendingRecruitmentApplicationCount = 0;
+      pendingRecruitmentApplicationCount = 0,
+      unreadChatMessageCount = 0;
 
   final int pendingMessageRequestCount;
   final int pendingRecruitmentApplicationCount;
+  final int unreadChatMessageCount;
 
   factory BadgeCounts.fromJson(Map<String, dynamic> json) {
     return BadgeCounts(
@@ -18,6 +21,9 @@ class BadgeCounts {
       ),
       pendingRecruitmentApplicationCount: _nonNegativeInt(
         json['pending_recruitment_application_count'],
+      ),
+      unreadChatMessageCount: _nonNegativeInt(
+        json['unread_chat_message_count'],
       ),
     );
   }

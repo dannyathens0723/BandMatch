@@ -35,10 +35,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       _service.fetchMessages(widget.roomId),
       _service.fetchCurrentProfileId(),
     ]);
-    return _ChatRoomData(
+    final data = _ChatRoomData(
       messages: results[0] as List<ChatRoomMessage>,
       currentUserId: results[1] as String,
     );
+    try {
+      await _service.markRoomRead(widget.roomId);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Chat messages loaded but room could not be marked read: '
+        '$error\n$stackTrace',
+      );
+    }
+    return data;
   }
 
   void _reload() => setState(() => _roomData = _loadRoomData());

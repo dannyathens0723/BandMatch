@@ -9,10 +9,21 @@ void main() {
     final counts = BadgeCounts.fromJson({
       'pending_message_request_count': 3,
       'pending_recruitment_application_count': '7',
+      'unread_chat_message_count': 4,
     });
 
     expect(counts.pendingMessageRequestCount, 3);
     expect(counts.pendingRecruitmentApplicationCount, 7);
+    expect(counts.unreadChatMessageCount, 4);
+  });
+
+  test('BadgeCounts treats a missing unread field as zero', () {
+    final counts = BadgeCounts.fromJson({
+      'pending_message_request_count': 1,
+      'pending_recruitment_application_count': 2,
+    });
+
+    expect(counts.unreadChatMessageCount, 0);
   });
 
   testWidgets('CountBadge hides zero and caps large labels at 99+', (

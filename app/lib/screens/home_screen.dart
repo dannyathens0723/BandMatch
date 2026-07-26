@@ -75,10 +75,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openChatRooms() {
-    Navigator.of(
+  Future<void> _openChatRooms() async {
+    await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const ChatRoomsScreen()));
+    if (mounted) await _loadBadgeCounts();
   }
 
   Future<void> _openMyPage() async {
@@ -104,10 +105,14 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _openMemberList,
             icon: const Icon(Icons.people_outline),
           ),
-          IconButton(
-            tooltip: 'メッセージ',
-            onPressed: _openChatRooms,
-            icon: const Icon(Icons.forum_outlined),
+          CountBadge(
+            count: _badgeCounts.unreadChatMessageCount,
+            semanticLabel: '未読メッセージ',
+            child: IconButton(
+              tooltip: 'メッセージ',
+              onPressed: _openChatRooms,
+              icon: const Icon(Icons.forum_outlined),
+            ),
           ),
           _MessageRequestInboxButton(
             pendingRequestCount: _badgeCounts.pendingMessageRequestCount,
@@ -163,10 +168,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: const Text('募集を探す'),
                       ),
                       const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: _openChatRooms,
-                        icon: const Icon(Icons.forum_outlined),
-                        label: const Text('メッセージ'),
+                      CountBadge(
+                        count: _badgeCounts.unreadChatMessageCount,
+                        semanticLabel: '未読メッセージ',
+                        child: OutlinedButton.icon(
+                          onPressed: _openChatRooms,
+                          icon: const Icon(Icons.forum_outlined),
+                          label: const Text('メッセージ'),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(

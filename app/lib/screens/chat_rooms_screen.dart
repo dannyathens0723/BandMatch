@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/chat_room_summary.dart';
 import '../services/chat_room_service.dart';
+import '../widgets/count_badge.dart';
 import 'chat_room_screen.dart';
 
 class ChatRoomsScreen extends StatefulWidget {
@@ -13,22 +14,86 @@ class ChatRoomsScreen extends StatefulWidget {
 
 class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
   final _service = ChatRoomService();
-  late Future<List<ChatRoomSummary>> _rooms;
+  List<ChatRoomSummary>? _rooms;
+  Object? _loadError;
+  bool _isLoading = true;
+  bool _isRefreshing = false;
+  int _loadRequestId = 0;
 
   @override
   void initState() {
     super.initState();
-    _rooms = _service.fetchMyChatRooms();
+    _loadRooms(showFullScreenLoading: true);
   }
 
-  void _reload() => setState(() => _rooms = _service.fetchMyChatRooms());
+  Future<bool> _loadRooms({
+    bool showFullScreenLoading = false,
+    bool showErrorSnackBar = false,
+  }) async {
+    final requestId = ++_loadRequestId;
+    setState(() {
+      _loadError = null;
+      if (showFullScreenLoading || _rooms == null) {
+        _isLoading = true;
+      } else {
+        _isRefreshing = true;
+      }
+    });
 
-  void _openRoom(ChatRoomSummary room) => Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) =>
-          ChatRoomScreen(roomId: room.roomId, roomTitle: room.displayName),
-    ),
-  );
+    try {
+      final rooms = await _service.fetchMyChatRooms();
+      if (!mounted || requestId != _loadRequestId) return false;
+      setState(() {
+        _rooms = rooms;
+        _loadError = null;
+      });
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('Chat room list refresh failed: $error\n$stackTrace');
+      if (mounted && requestId == _loadRequestId) {
+        setState(() => _loadError = error);
+        if (showErrorSnackBar && _rooms != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('メッセージルームを更新できませんでした。時間をおいて再度お試しください。'),
+            ),
+          );
+        }
+      }
+      return false;
+    } finally {
+      if (mounted && requestId == _loadRequestId) {
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openRoom(ChatRoomSummary room) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ChatRoomScreen(roomId: room.roomId, roomTitle: room.displayName),
+      ),
+    );
+    if (!mounted) return;
+
+    final currentRooms = _rooms;
+    if (currentRooms != null) {
+      setState(
+        () => _rooms = currentRooms
+            .map(
+              (currentRoom) => currentRoom.roomId == room.roomId
+                  ? currentRoom.copyWith(unreadCount: 0)
+                  : currentRoom,
+            )
+            .toList(growable: false),
+      );
+    }
+    await _loadRooms();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,41 +103,44 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
         actions: [
           IconButton(
             tooltip: '再読み込み',
-            onPressed: _reload,
-            icon: const Icon(Icons.refresh),
+            onPressed: _isRefreshing
+                ? null
+                : () => _loadRooms(showErrorSnackBar: true),
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
           ),
           const SizedBox(width: 12),
         ],
       ),
       body: SafeArea(
         top: false,
-        child: FutureBuilder<List<ChatRoomSummary>>(
-          future: _rooms,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) return _ChatRoomsError(onRetry: _reload);
-
-            final rooms = snapshot.requireData;
-            if (rooms.isEmpty) return const _EmptyChatRooms();
-
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                  itemCount: rooms.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) => _ChatRoomCard(
-                    room: rooms[index],
-                    onTap: () => _openRoom(rooms[index]),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _loadError != null && _rooms == null
+            ? _ChatRoomsError(
+                onRetry: () => _loadRooms(showFullScreenLoading: true),
+              )
+            : (_rooms ?? const []).isEmpty
+            ? const _EmptyChatRooms()
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                    itemCount: _rooms!.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) => _ChatRoomCard(
+                      room: _rooms![index],
+                      onTap: () => _openRoom(_rooms![index]),
+                    ),
                   ),
                 ),
               ),
-            );
-          },
-        ),
       ),
     );
   }
@@ -126,7 +194,11 @@ class _ChatRoomCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              CountBadge(
+                count: room.unreadCount,
+                semanticLabel: '${room.displayName}の未読メッセージ',
+                child: const Icon(Icons.chevron_right),
+              ),
             ],
           ),
         ),

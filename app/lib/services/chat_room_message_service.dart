@@ -73,6 +73,25 @@ class ChatRoomMessageService {
     }
   }
 
+  Future<void> markRoomRead(String roomId) async {
+    try {
+      final updated = await _client.rpc(
+        'mark_chat_room_read',
+        params: {'p_room_id': roomId},
+      );
+      if (updated != true) {
+        throw StateError('メッセージを既読にできませんでした。');
+      }
+    } on PostgrestException catch (error, stackTrace) {
+      debugPrint(
+        'Mark chat room read failed: '
+        'message=${error.message}, code=${error.code}, '
+        'details=${error.details}, hint=${error.hint}\n$stackTrace',
+      );
+      rethrow;
+    }
+  }
+
   Future<String> fetchCurrentProfileId() async {
     final profileId = await _client.rpc('current_user_id');
     if (profileId is! String || profileId.isEmpty) {

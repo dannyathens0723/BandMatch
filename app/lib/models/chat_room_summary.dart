@@ -7,6 +7,7 @@ class ChatRoomSummary {
     this.avatarUrl,
     this.experienceLevel,
     this.lastMessageAt,
+    this.unreadCount = 0,
   });
 
   final String roomId;
@@ -16,6 +17,7 @@ class ChatRoomSummary {
   final String? experienceLevel;
   final DateTime? lastMessageAt;
   final DateTime createdAt;
+  final int unreadCount;
 
   factory ChatRoomSummary.fromJson(Map<String, dynamic> json) {
     return ChatRoomSummary(
@@ -28,6 +30,30 @@ class ChatRoomSummary {
           ? null
           : DateTime.parse(json['last_message_at'] as String).toLocal(),
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
+      unreadCount: _nonNegativeInt(json['unread_count']),
     );
+  }
+
+  ChatRoomSummary copyWith({int? unreadCount}) {
+    return ChatRoomSummary(
+      roomId: roomId,
+      otherUserId: otherUserId,
+      displayName: displayName,
+      createdAt: createdAt,
+      avatarUrl: avatarUrl,
+      experienceLevel: experienceLevel,
+      lastMessageAt: lastMessageAt,
+      unreadCount: unreadCount ?? this.unreadCount,
+    );
+  }
+
+  static int _nonNegativeInt(dynamic value) {
+    final parsed = switch (value) {
+      int count => count,
+      num count => count.toInt(),
+      String count => int.tryParse(count) ?? 0,
+      _ => 0,
+    };
+    return parsed < 0 ? 0 : parsed;
   }
 }
