@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../models/badge_counts.dart';
 import '../models/master_data_item.dart';
+import '../services/badge_count_service.dart';
 import '../services/master_data_service.dart';
-import '../services/received_message_request_service.dart';
+import '../widgets/count_badge.dart';
 import '../widgets/master_data_section.dart';
 import 'chat_rooms_screen.dart';
 import 'member_list_screen.dart';
@@ -19,30 +21,34 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final MasterDataService _masterDataService = MasterDataService();
-  final ReceivedMessageRequestService _receivedRequestsService =
-      ReceivedMessageRequestService();
+  final BadgeCountService _badgeCountService = BadgeCountService();
   late Future<MasterData> _masterData;
-  int _pendingRequestCount = 0;
+  BadgeCounts _badgeCounts = const BadgeCounts.empty();
+  int _badgeLoadRequestId = 0;
 
   @override
   void initState() {
     super.initState();
     _masterData = _masterDataService.fetchActiveMasterData();
-    _loadPendingRequestCount();
+    _loadBadgeCounts();
   }
 
   void _reload() {
     setState(() => _masterData = _masterDataService.fetchActiveMasterData());
-    _loadPendingRequestCount();
+    _loadBadgeCounts();
   }
 
-  Future<void> _loadPendingRequestCount() async {
+  Future<void> _loadBadgeCounts() async {
+    final requestId = ++_badgeLoadRequestId;
     try {
-      final count = await _receivedRequestsService
-          .fetchPendingReceivedRequestCount();
-      if (mounted) setState(() => _pendingRequestCount = count);
-    } catch (_) {
-      if (mounted) setState(() => _pendingRequestCount = 0);
+      final counts = await _badgeCountService.fetchMyBadgeCounts();
+      if (!mounted || requestId != _badgeLoadRequestId) return;
+      setState(() => _badgeCounts = counts);
+    } catch (error, stackTrace) {
+      debugPrint('Home badge count load failed: $error\n$stackTrace');
+      if (mounted && requestId == _badgeLoadRequestId) {
+        setState(() => _badgeCounts = const BadgeCounts.empty());
+      }
     }
   }
 
@@ -52,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => const ReceivedMessageRequestsScreen(),
       ),
     );
-    if (mounted) await _loadPendingRequestCount();
+    if (mounted) await _loadBadgeCounts();
   }
 
   void _openMemberList() {
@@ -75,10 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
     ).push(MaterialPageRoute<void>(builder: (_) => const ChatRoomsScreen()));
   }
 
-  void _openMyPage() {
-    Navigator.of(
+  Future<void> _openMyPage() async {
+    await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const MyPageScreen()));
+    if (mounted) await _loadBadgeCounts();
   }
 
   @override
@@ -103,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.forum_outlined),
           ),
           _MessageRequestInboxButton(
-            hasPendingRequests: _pendingRequestCount > 0,
+            pendingRequestCount: _badgeCounts.pendingMessageRequestCount,
             onPressed: _openReceivedRequests,
           ),
           IconButton(
@@ -218,22 +225,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _MessageRequestInboxButton extends StatelessWidget {
   const _MessageRequestInboxButton({
-    required this.hasPendingRequests,
+    required this.pendingRequestCount,
     required this.onPressed,
   });
 
-  final bool hasPendingRequests;
+  final int pendingRequestCount;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final button = IconButton(
-      tooltip: 'メッセージリクエスト',
-      onPressed: onPressed,
-      icon: const Icon(Icons.mail_outline),
+    return CountBadge(
+      count: pendingRequestCount,
+      semanticLabel: '未対応のメッセージリクエスト',
+      child: IconButton(
+        tooltip: 'メッセージリクエスト',
+        onPressed: onPressed,
+        icon: const Icon(Icons.mail_outline),
+      ),
     );
-    if (!hasPendingRequests) return button;
-    return Badge(smallSize: 9, child: button);
   }
 }
 

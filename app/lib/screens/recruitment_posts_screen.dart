@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../models/badge_counts.dart';
 import '../models/my_group_profile.dart';
 import '../models/recruitment_post.dart';
+import '../services/badge_count_service.dart';
 import '../services/recruitment_post_service.dart';
+import '../widgets/count_badge.dart';
 import 'recruitment_applications_screen.dart';
 import 'recruitment_post_edit_screen.dart';
 
@@ -17,13 +20,37 @@ class RecruitmentPostsScreen extends StatefulWidget {
 
 class _RecruitmentPostsScreenState extends State<RecruitmentPostsScreen> {
   final _service = RecruitmentPostService();
+  final _badgeCountService = BadgeCountService();
   late Future<List<RecruitmentPost>> _posts;
+  BadgeCounts _badgeCounts = const BadgeCounts.empty();
   bool _isRefreshing = false;
+  int _badgeLoadRequestId = 0;
 
   @override
   void initState() {
     super.initState();
     _posts = _service.fetchMyGroupPosts(widget.group.id);
+    _loadBadgeCounts();
+  }
+
+  Future<void> _loadBadgeCounts() async {
+    final requestId = ++_badgeLoadRequestId;
+    try {
+      final counts = await _badgeCountService.fetchMyBadgeCounts();
+      if (!mounted || requestId != _badgeLoadRequestId) return;
+      setState(() => _badgeCounts = counts);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Recruitment posts badge count load failed: $error\n$stackTrace',
+      );
+      if (mounted && requestId == _badgeLoadRequestId) {
+        setState(() => _badgeCounts = const BadgeCounts.empty());
+      }
+    }
+  }
+
+  Future<void> _reloadPage() async {
+    await Future.wait([_reload(showErrorSnackBar: true), _loadBadgeCounts()]);
   }
 
   Future<bool> _reload({bool showErrorSnackBar = false}) async {
@@ -82,12 +109,13 @@ class _RecruitmentPostsScreenState extends State<RecruitmentPostsScreen> {
     }
   }
 
-  void _openApplications() {
-    Navigator.of(context).push(
+  Future<void> _openApplications() async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => RecruitmentApplicationsScreen(group: widget.group),
       ),
     );
+    if (mounted) await _loadBadgeCounts();
   }
 
   @override
@@ -98,9 +126,7 @@ class _RecruitmentPostsScreenState extends State<RecruitmentPostsScreen> {
         actions: [
           IconButton(
             tooltip: '再読み込み',
-            onPressed: _isRefreshing
-                ? null
-                : () => _reload(showErrorSnackBar: true),
+            onPressed: _isRefreshing ? null : _reloadPage,
             icon: _isRefreshing
                 ? const SizedBox(
                     width: 20,
@@ -109,10 +135,14 @@ class _RecruitmentPostsScreenState extends State<RecruitmentPostsScreen> {
                   )
                 : const Icon(Icons.refresh),
           ),
-          IconButton(
-            tooltip: '応募一覧',
-            onPressed: _openApplications,
-            icon: const Icon(Icons.assignment_ind_outlined),
+          CountBadge(
+            count: _badgeCounts.pendingRecruitmentApplicationCount,
+            semanticLabel: '管理グループの未対応の応募者',
+            child: IconButton(
+              tooltip: '応募一覧',
+              onPressed: _openApplications,
+              icon: const Icon(Icons.assignment_ind_outlined),
+            ),
           ),
           const SizedBox(width: 12),
         ],

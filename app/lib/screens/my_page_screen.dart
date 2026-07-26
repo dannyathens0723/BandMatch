@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/badge_counts.dart';
 import '../models/my_page_profile.dart';
+import '../services/badge_count_service.dart';
 import '../services/my_page_service.dart';
+import '../widgets/count_badge.dart';
 import 'blocked_users_screen.dart';
 import 'my_groups_screen.dart';
 import 'profile_edit_screen.dart';
@@ -16,17 +19,42 @@ class MyPageScreen extends StatefulWidget {
 
 class _MyPageScreenState extends State<MyPageScreen> {
   final _myPageService = MyPageService();
+  final _badgeCountService = BadgeCountService();
   MyPageProfile? _profile;
+  BadgeCounts _badgeCounts = const BadgeCounts.empty();
   Object? _loadError;
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isSigningOut = false;
   int _loadRequestId = 0;
+  int _badgeLoadRequestId = 0;
 
   @override
   void initState() {
     super.initState();
     _loadProfile(showFullScreenLoading: true);
+    _loadBadgeCounts();
+  }
+
+  Future<void> _loadBadgeCounts() async {
+    final requestId = ++_badgeLoadRequestId;
+    try {
+      final counts = await _badgeCountService.fetchMyBadgeCounts();
+      if (!mounted || requestId != _badgeLoadRequestId) return;
+      setState(() => _badgeCounts = counts);
+    } catch (error, stackTrace) {
+      debugPrint('My Page badge count load failed: $error\n$stackTrace');
+      if (mounted && requestId == _badgeLoadRequestId) {
+        setState(() => _badgeCounts = const BadgeCounts.empty());
+      }
+    }
+  }
+
+  Future<void> _reloadMyPage({bool showFullScreenLoading = false}) async {
+    await Future.wait([
+      _loadProfile(showFullScreenLoading: showFullScreenLoading),
+      _loadBadgeCounts(),
+    ]);
   }
 
   Future<bool> _loadProfile({bool showFullScreenLoading = false}) async {
@@ -93,6 +121,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const MyGroupsScreen()));
+    if (mounted) await _loadBadgeCounts();
   }
 
   Future<void> _openBlockedUsers() async {
@@ -134,7 +163,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
             tooltip: '再読み込み',
             onPressed: _isRefreshing
                 ? null
-                : () => _loadProfile(showFullScreenLoading: profile == null),
+                : () => _reloadMyPage(showFullScreenLoading: profile == null),
             icon: _isRefreshing
                 ? const SizedBox(
                     width: 20,
@@ -174,6 +203,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                         isSigningOut: _isSigningOut,
                         onProfileEdit: _openProfileEdit,
                         onMyGroups: _openMyGroups,
+                        pendingRecruitmentApplicationCount:
+                            _badgeCounts.pendingRecruitmentApplicationCount,
                         onBlockedUsers: _openBlockedUsers,
                         onSignOut: _signOut,
                         onComingSoon: _showComingSoon,
@@ -280,6 +311,7 @@ class _ActionCard extends StatelessWidget {
     required this.isSigningOut,
     required this.onProfileEdit,
     required this.onMyGroups,
+    required this.pendingRecruitmentApplicationCount,
     required this.onBlockedUsers,
     required this.onSignOut,
     required this.onComingSoon,
@@ -288,6 +320,7 @@ class _ActionCard extends StatelessWidget {
   final bool isSigningOut;
   final VoidCallback onProfileEdit;
   final VoidCallback onMyGroups;
+  final int pendingRecruitmentApplicationCount;
   final VoidCallback onBlockedUsers;
   final VoidCallback onSignOut;
   final void Function(String title) onComingSoon;
@@ -309,7 +342,21 @@ class _ActionCard extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.groups_outlined),
               title: const Text('バンド・グループ'),
-              trailing: const Icon(Icons.chevron_right),
+              subtitle: pendingRecruitmentApplicationCount > 0
+                  ? const Text('未対応の応募があります')
+                  : null,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CountBadge(
+                    count: pendingRecruitmentApplicationCount,
+                    semanticLabel: '未対応の応募者',
+                    child: const Icon(Icons.assignment_ind_outlined),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
               onTap: onMyGroups,
             ),
             const Divider(height: 1),
