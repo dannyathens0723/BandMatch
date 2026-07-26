@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/my_page_profile.dart';
 import '../services/my_page_service.dart';
+import 'blocked_users_screen.dart';
 import 'my_groups_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -94,6 +95,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
     ).push(MaterialPageRoute<void>(builder: (_) => const MyGroupsScreen()));
   }
 
+  Future<void> _openBlockedUsers() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const BlockedUsersScreen()));
+  }
+
   Future<void> _signOut() async {
     if (_isSigningOut) return;
     setState(() => _isSigningOut = true);
@@ -167,6 +174,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                         isSigningOut: _isSigningOut,
                         onProfileEdit: _openProfileEdit,
                         onMyGroups: _openMyGroups,
+                        onBlockedUsers: _openBlockedUsers,
                         onSignOut: _signOut,
                         onComingSoon: _showComingSoon,
                       ),
@@ -272,6 +280,7 @@ class _ActionCard extends StatelessWidget {
     required this.isSigningOut,
     required this.onProfileEdit,
     required this.onMyGroups,
+    required this.onBlockedUsers,
     required this.onSignOut,
     required this.onComingSoon,
   });
@@ -279,6 +288,7 @@ class _ActionCard extends StatelessWidget {
   final bool isSigningOut;
   final VoidCallback onProfileEdit;
   final VoidCallback onMyGroups;
+  final VoidCallback onBlockedUsers;
   final VoidCallback onSignOut;
   final void Function(String title) onComingSoon;
 
@@ -311,10 +321,10 @@ class _ActionCard extends StatelessWidget {
             ),
             const Divider(height: 1),
             ListTile(
-              leading: const Icon(Icons.shield_outlined),
-              title: const Text('ブロック・通報管理'),
-              subtitle: const Text('次のステップで実装します'),
-              onTap: () => onComingSoon('ブロック・通報管理'),
+              leading: const Icon(Icons.block_outlined),
+              title: const Text('ブロックしたユーザー'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: onBlockedUsers,
             ),
             const Divider(height: 1),
             ListTile(
