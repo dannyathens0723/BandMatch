@@ -315,14 +315,17 @@ class StageRecruitmentCard extends StatelessWidget {
     required this.data,
     super.key,
     this.compact = false,
+    this.onTap,
   });
 
   final StageRecruitmentPreview data;
   final bool compact;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return StageCard(
+      onTap: onTap,
       padding: EdgeInsets.all(compact ? 12 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,13 +411,15 @@ class StageRecruitmentCard extends StatelessWidget {
 }
 
 class StageEventCard extends StatelessWidget {
-  const StageEventCard({required this.data, super.key});
+  const StageEventCard({required this.data, super.key, this.onTap});
 
   final StageEventPreview data;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return StageCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

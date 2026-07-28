@@ -38,4 +38,15 @@ void main() {
     expect(previewBranch, greaterThanOrEqualTo(0));
     expect(supabaseInitialization, greaterThan(previewBranch));
   });
+
+  test('go_router is isolated to the STAGE preview source', () {
+    final previewApp = File(
+      'lib/stage_preview/stage_preview_app.dart',
+    ).readAsStringSync();
+    final productionApp = File('lib/app.dart').readAsStringSync();
+
+    expect(previewApp, contains('MaterialApp.router'));
+    expect(productionApp, isNot(contains('go_router')));
+    expect(productionApp, contains('MaterialApp('));
+  });
 }

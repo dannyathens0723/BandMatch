@@ -5,7 +5,9 @@ import '../theme/stage_design_tokens.dart';
 import '../widgets/stage_common.dart';
 
 class StageStageScreen extends StatelessWidget {
-  const StageStageScreen({super.key});
+  const StageStageScreen({super.key, this.onSampleEventTap});
+
+  final VoidCallback? onSampleEventTap;
 
   @override
   Widget build(BuildContext context) {
@@ -39,8 +41,17 @@ class StageStageScreen extends StatelessWidget {
           ),
         ),
         const StageSectionHeader(title: 'イベント・大会', actionLabel: 'もっと見る'),
-        ...StagePreviewData.events.expand(
-          (item) => [StageEventCard(data: item), const SizedBox(height: 12)],
+        ...StagePreviewData.events.indexed.expand(
+          (entry) => [
+            StageEventCard(
+              key: entry.$1 == 0
+                  ? const ValueKey('stage-stage-sample-event')
+                  : null,
+              data: entry.$2,
+              onTap: entry.$1 == 0 ? onSampleEventTap : null,
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
         const StageCard(
           gradient: StageDesignTokens.heroGradient,

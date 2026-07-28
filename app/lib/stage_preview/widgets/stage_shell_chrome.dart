@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../navigation/stage_tab.dart';
 import '../theme/stage_design_tokens.dart';
 import 'stage_common.dart';
 
@@ -89,25 +90,13 @@ class StageAppHeader extends StatelessWidget {
 
 class StageBottomNavigation extends StatelessWidget {
   const StageBottomNavigation({
-    required this.currentIndex,
+    required this.currentTab,
     required this.onSelected,
     super.key,
   });
 
-  final int currentIndex;
-  final ValueChanged<int> onSelected;
-
-  static const _items = [
-    (Icons.home_outlined, Icons.home_rounded, 'ホーム'),
-    (Icons.groups_outlined, Icons.groups_rounded, 'クルー'),
-    (Icons.mic_none_outlined, Icons.mic_rounded, 'ステージ'),
-    (Icons.location_on_outlined, Icons.location_on_rounded, 'スタジオ'),
-    (
-      Icons.sentiment_satisfied_alt_outlined,
-      Icons.sentiment_satisfied_alt_rounded,
-      'マイページ',
-    ),
-  ];
+  final StageTab currentTab;
+  final ValueChanged<StageTab> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -120,9 +109,8 @@ class StageBottomNavigation extends StatelessWidget {
         ),
       ),
       child: Row(
-        children: List.generate(_items.length, (index) {
-          final item = _items[index];
-          final selected = index == currentIndex;
+        children: StageTab.values.map((tab) {
+          final selected = tab == currentTab;
           final color = selected
               ? StageDesignTokens.purple
               : StageDesignTokens.textMuted;
@@ -130,17 +118,17 @@ class StageBottomNavigation extends StatelessWidget {
             child: Semantics(
               selected: selected,
               button: true,
-              label: item.$3,
+              label: tab.label,
               child: InkWell(
-                key: ValueKey('stage-tab-$index'),
-                onTap: () => onSelected(index),
+                key: ValueKey('stage-tab-${tab.name}'),
+                onTap: () => onSelected(tab),
                 child: Padding(
                   padding: const EdgeInsets.only(top: 7, bottom: 5),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        selected ? item.$2 : item.$1,
+                        selected ? tab.selectedIcon : tab.icon,
                         size: 22,
                         color: color,
                       ),
@@ -148,7 +136,7 @@ class StageBottomNavigation extends StatelessWidget {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          item.$3,
+                          tab.label,
                           maxLines: 1,
                           style: TextStyle(
                             color: color,
@@ -166,62 +154,7 @@ class StageBottomNavigation extends StatelessWidget {
               ),
             ),
           );
-        }),
-      ),
-    );
-  }
-}
-
-class StagePreviewPlaceholderSheet extends StatelessWidget {
-  const StagePreviewPlaceholderSheet({
-    required this.icon,
-    required this.title,
-    required this.message,
-    super.key,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: StageDesignTokens.border,
-                borderRadius: BorderRadius.circular(
-                  StageDesignTokens.radiusPill,
-                ),
-              ),
-            ),
-            const SizedBox(height: 22),
-            Icon(icon, size: 34, color: StageDesignTokens.purple),
-            const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: StageDesignTokens.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            StagePrimaryButton(
-              label: '閉じる',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
+        }).toList(),
       ),
     );
   }

@@ -1,42 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../navigation/stage_preview_router.dart';
+import '../navigation/stage_tab.dart';
 import '../theme/stage_design_tokens.dart';
 import '../widgets/stage_shell_chrome.dart';
-import 'stage_crew_screen.dart';
-import 'stage_home_screen.dart';
-import 'stage_my_page_screen.dart';
-import 'stage_stage_screen.dart';
-import 'stage_studio_screen.dart';
 
-class StagePreviewShell extends StatefulWidget {
+class StagePreviewShell extends StatelessWidget {
   const StagePreviewShell({
+    required this.navigationShell,
+    required this.homeController,
     super.key,
-    this.initialTabIndex = 0,
-    this.initialHomeHasCrew = false,
   });
 
-  final int initialTabIndex;
-  final bool initialHomeHasCrew;
+  final StatefulNavigationShell navigationShell;
+  final StageHomePreviewController homeController;
 
-  @override
-  State<StagePreviewShell> createState() => _StagePreviewShellState();
-}
-
-class _StagePreviewShellState extends State<StagePreviewShell> {
-  late int _currentIndex;
-  late bool _homeHasCrew;
-
-  static const _titles = ['ホーム', 'クルー', 'ステージ', 'スタジオ', 'マイページ'];
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialTabIndex.clamp(0, 4);
-    _homeHasCrew = widget.initialHomeHasCrew;
+  StageTab get currentTab {
+    return StageTab.fromBranchIndex(navigationShell.currentIndex);
   }
 
   @override
   Widget build(BuildContext context) {
+    final selectedTab = currentTab;
     return ColoredBox(
       color: StageDesignTokens.charcoal,
       child: Center(
@@ -51,38 +37,20 @@ class _StagePreviewShellState extends State<StagePreviewShell> {
                 body: Column(
                   children: [
                     StageAppHeader(
-                      title: _titles[_currentIndex],
-                      isHome: _currentIndex == 0,
-                      onLogoTap: _toggleHomeState,
-                      onNotifications: () => _showPlaceholder(
-                        icon: Icons.notifications_none_rounded,
-                        title: '通知',
-                        message: '通知一覧は次の実装ステップで接続します。',
-                      ),
-                      onMessages: () => _showPlaceholder(
-                        icon: Icons.mail_outline_rounded,
-                        title: 'メッセージ',
-                        message: 'このプレビューでは実データに接続しません。',
-                      ),
-                    ),
-                    Expanded(
-                      child: IndexedStack(
-                        index: _currentIndex,
-                        children: [
-                          StageHomeScreen(hasCrew: _homeHasCrew),
-                          const StageCrewScreen(),
-                          const StageStageScreen(),
-                          const StageStudioScreen(),
-                          const StageMyPageScreen(),
-                        ],
-                      ),
-                    ),
-                    StageBottomNavigation(
-                      currentIndex: _currentIndex,
-                      onSelected: (index) {
-                        if (index == _currentIndex) return;
-                        setState(() => _currentIndex = index);
+                      title: selectedTab.label,
+                      isHome: selectedTab == StageTab.home,
+                      onLogoTap: homeController.toggle,
+                      onNotifications: () {
+                        context.push(StageRoutes.notifications);
                       },
+                      onMessages: () {
+                        context.push(StageRoutes.messages);
+                      },
+                    ),
+                    Expanded(child: navigationShell),
+                    StageBottomNavigation(
+                      currentTab: selectedTab,
+                      onSelected: _selectTab,
                     ),
                   ],
                 ),
@@ -94,33 +62,10 @@ class _StagePreviewShellState extends State<StagePreviewShell> {
     );
   }
 
-  void _toggleHomeState() {
-    if (_currentIndex != 0) return;
-    setState(() => _homeHasCrew = !_homeHasCrew);
-  }
-
-  void _showPlaceholder({
-    required IconData icon,
-    required String title,
-    required String message,
-  }) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: false,
-      backgroundColor: StageDesignTokens.surface,
-      constraints: const BoxConstraints(
-        maxWidth: StageDesignTokens.maxContentWidth,
-      ),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(StageDesignTokens.radius20),
-        ),
-      ),
-      builder: (context) => StagePreviewPlaceholderSheet(
-        icon: icon,
-        title: title,
-        message: message,
-      ),
+  void _selectTab(StageTab tab) {
+    navigationShell.goBranch(
+      tab.branchIndex,
+      initialLocation: tab == currentTab,
     );
   }
 }

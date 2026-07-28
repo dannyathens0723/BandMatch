@@ -5,7 +5,9 @@ import '../theme/stage_design_tokens.dart';
 import '../widgets/stage_common.dart';
 
 class StageCrewScreen extends StatefulWidget {
-  const StageCrewScreen({super.key});
+  const StageCrewScreen({super.key, this.onSampleRecruitmentTap});
+
+  final VoidCallback? onSampleRecruitmentTap;
 
   @override
   State<StageCrewScreen> createState() => _StageCrewScreenState();
@@ -52,9 +54,15 @@ class _StageCrewScreenState extends State<StageCrewScreen> {
         ),
       ),
       const StageSectionHeader(title: '募集中のクルー', actionLabel: '絞り込み'),
-      ...StagePreviewData.recruitments.expand(
-        (item) => [
-          StageRecruitmentCard(data: item),
+      ...StagePreviewData.recruitments.indexed.expand(
+        (entry) => [
+          StageRecruitmentCard(
+            key: entry.$1 == 0
+                ? const ValueKey('stage-crew-sample-recruitment')
+                : null,
+            data: entry.$2,
+            onTap: entry.$1 == 0 ? widget.onSampleRecruitmentTap : null,
+          ),
           const SizedBox(height: 12),
         ],
       ),
