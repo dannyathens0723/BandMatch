@@ -3,9 +3,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'config/app_config.dart';
+import 'stage_preview/stage_preview_app.dart';
+import 'stage_preview/stage_preview_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (StagePreviewConfig.enabled) {
+    runApp(const StagePreviewApp());
+    return;
+  }
 
   if (AppConfig.isSupabaseConfigured) {
     await Supabase.initialize(
