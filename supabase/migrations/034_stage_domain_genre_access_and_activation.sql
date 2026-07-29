@@ -871,55 +871,68 @@ begin
     )
     or pg_get_function_result(v_function_oid) <>
       'TABLE(id uuid, code text, name text, domain text, category text, sort_order smallint)'
-    or not has_function_privilege(
-      'anon',
-      v_function_oid,
-      'EXECUTE'
-    )
-    or not has_function_privilege(
-      'authenticated',
-      v_function_oid,
-      'EXECUTE'
-    )
-    or exists (
-      select 1
-      from pg_proc procedure_row,
-        lateral aclexplode(
-          coalesce(
-            procedure_row.proacl,
-            acldefault('f', procedure_row.proowner)
-          )
-        ) acl_row
-      where procedure_row.oid = v_function_oid
-        and acl_row.grantee = 0
-        and acl_row.privilege_type = 'EXECUTE'
-    )
-    or exists (
-      select 1
-      from pg_proc procedure_row,
-        lateral aclexplode(
-          coalesce(
-            procedure_row.proacl,
-            acldefault('f', procedure_row.proowner)
-          )
-        ) acl_row
-      where procedure_row.oid = v_function_oid
-        and acl_row.privilege_type = 'EXECUTE'
-        and acl_row.grantee not in (
-          v_function_owner,
-          (
-            select role_row.oid
-            from pg_roles role_row
-            where role_row.rolname = 'anon'
-          ),
-          (
-            select role_row.oid
-            from pg_roles role_row
-            where role_row.rolname = 'authenticated'
-          )
+  then
+    raise exception 'Active genre RPC function contract is incompatible'
+      using errcode = '55000';
+  end if;
+
+  if not has_function_privilege(
+    'anon',
+    v_function_oid,
+    'EXECUTE'
+  ) or not has_function_privilege(
+    'authenticated',
+    v_function_oid,
+    'EXECUTE'
+  ) then
+    raise exception 'Active genre RPC requires anon/authenticated EXECUTE'
+      using errcode = '55000';
+  end if;
+
+  if exists (
+    select 1
+    from pg_proc procedure_row,
+      lateral aclexplode(
+        coalesce(
+          procedure_row.proacl,
+          acldefault('f', procedure_row.proowner)
         )
-    ) then
-    raise exception 'Active genre RPC contract or grants are incompatible'
+      ) acl_row
+    where procedure_row.oid = v_function_oid
+      and acl_row.grantee = 0
+      and acl_row.privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'Active genre RPC must not grant PUBLIC EXECUTE'
+      using errcode = '55000';
+  end if;
+
+  -- Supabase may preserve service_role through project default privileges.
+  -- It is tolerated but never granted or revoked by this migration.
+  if exists (
+    select 1
+    from pg_proc procedure_row,
+      lateral aclexplode(
+        coalesce(
+          procedure_row.proacl,
+          acldefault('f', procedure_row.proowner)
+        )
+      ) acl_row
+    where procedure_row.oid = v_function_oid
+      and acl_row.privilege_type = 'EXECUTE'
+      and acl_row.grantee <> 0
+      and acl_row.grantee <> v_function_owner
+      and not exists (
+        select 1
+        from pg_roles grantee_role
+        where grantee_role.oid = acl_row.grantee
+          and grantee_role.rolname in (
+            'anon',
+            'authenticated',
+            'service_role'
+          )
+      )
+  ) then
+    raise exception 'Active genre RPC has an unexpected EXECUTE grantee'
       using errcode = '55000';
   end if;
 
