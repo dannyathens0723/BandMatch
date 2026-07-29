@@ -13,9 +13,12 @@ void main() {
       final source = entity.readAsStringSync();
       const forbidden = [
         'supabase_flutter',
+        'Supabase.instance',
         '/services/',
         '../services/',
         'package:app/services/',
+        'master_data_service.dart',
+        'MasterDataService',
         'package:app/models/',
         '../models/member_',
         '../models/profile_',
@@ -29,6 +32,27 @@ void main() {
 
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
+
+  test(
+    'preview does not import or call the production master-data service',
+    () {
+      final previewDirectory = Directory('lib/stage_preview');
+      final violations = previewDirectory
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dart'))
+          .where((file) {
+            final source = file.readAsStringSync();
+            return source.contains('master_data_service.dart') ||
+                source.contains('MasterDataService') ||
+                source.contains('fetchActiveMasterData');
+          })
+          .map((file) => file.path)
+          .toList();
+
+      expect(violations, isEmpty, reason: violations.join('\n'));
+    },
+  );
 
   test('preview entry branch occurs before Supabase initialization', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
