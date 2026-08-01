@@ -1,4 +1,5 @@
 import 'performance_domain.dart';
+import 'stage_uuid.dart';
 
 final class StageGenre {
   const StageGenre({
@@ -65,14 +66,9 @@ final class StageMasterDataParseException implements Exception {
   String toString() => 'StageMasterDataParseException: $message';
 }
 
-final RegExp _uuidPattern = RegExp(
-  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
-  r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-);
-
 String _requiredUuid(Map<String, dynamic> json, String key) {
   final value = _requiredString(json, key);
-  if (!_uuidPattern.hasMatch(value)) {
+  if (!isValidStageUuid(value)) {
     throw StageMasterDataParseException('$key must be a UUID');
   }
   return value;
