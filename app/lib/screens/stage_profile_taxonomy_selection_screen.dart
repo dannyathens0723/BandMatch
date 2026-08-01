@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/performance_domain.dart';
 import '../models/stage_master_data.dart';
 import '../models/stage_profile_taxonomy_draft.dart';
+import '../models/stage_profile_taxonomy_persistence_result.dart';
 import '../services/stage_master_data_service.dart';
+import '../services/stage_profile_taxonomy_persistence_service.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 import 'stage_profile_taxonomy_summary_screen.dart';
@@ -12,10 +14,12 @@ class StageProfileTaxonomySelectionScreen extends StatefulWidget {
   StageProfileTaxonomySelectionScreen({
     super.key,
     this.service,
+    this.persistenceService,
     StageProfileTaxonomySelection? initialSelection,
   }) : initialSelection = initialSelection ?? StageProfileTaxonomySelection();
 
   final StageMasterDataService? service;
+  final StageProfileTaxonomyPersistenceService? persistenceService;
   final StageProfileTaxonomySelection initialSelection;
 
   @override
@@ -26,6 +30,7 @@ class StageProfileTaxonomySelectionScreen extends StatefulWidget {
 class _StageProfileTaxonomySelectionScreenState
     extends State<StageProfileTaxonomySelectionScreen> {
   late final StageMasterDataService _service;
+  late final StageProfileTaxonomyPersistenceService _persistenceService;
   late StageProfileTaxonomySelection _selection;
 
   _TaxonomyLoadStatus _genreStatus = _TaxonomyLoadStatus.loading;
@@ -34,16 +39,25 @@ class _StageProfileTaxonomySelectionScreenState
       const StageProfileTaxonomyValidation();
   List<StageGenre> _genres = const [];
   List<StagePerformanceRole> _roles = const [];
+  List<String> _preferredGenreOrder = const [];
+  List<String> _preferredRoleOrder = const [];
+  StageProfileTaxonomyPersistenceResult? _persistedTaxonomy;
+  _PersistenceLoadStatus _persistenceStatus =
+      _PersistenceLoadStatus.loading;
   int _genreRequestId = 0;
   int _roleRequestId = 0;
+  int _persistenceRequestId = 0;
 
   @override
   void initState() {
     super.initState();
     _service = widget.service ?? StageMasterDataService();
+    _persistenceService =
+        widget.persistenceService ?? StageProfileTaxonomyPersistenceService();
     _selection = widget.initialSelection;
     _loadGenres(showLoading: false);
     _loadRoles(showLoading: false);
+    _loadPersistedTaxonomy(showLoading: false);
   }
 
   Future<void> _loadGenres({bool showLoading = true}) async {
@@ -57,12 +71,10 @@ class _StageProfileTaxonomySelectionScreenState
       if (!mounted || requestId != _genreRequestId) return;
       setState(() {
         _genres = genres;
-        _selection = _selection.retainAvailableGenres(
-          genres.map((genre) => genre.id),
-        );
         _genreStatus = genres.isEmpty
             ? _TaxonomyLoadStatus.empty
             : _TaxonomyLoadStatus.loaded;
+        _synchronizePersistedSelectionIfReady();
       });
     } on StageMasterDataParseException catch (error, stackTrace) {
       _logLoadFailure('genres', error, stackTrace);
@@ -90,13 +102,12 @@ class _StageProfileTaxonomySelectionScreenState
         PerformanceDomain.dance,
       );
       if (!mounted || requestId != _roleRequestId) return;
-      final orderedIds = roles.map((role) => role.id).toList(growable: false);
       setState(() {
         _roles = roles;
-        _selection = _selection.retainAvailableRoles(orderedIds);
         _roleStatus = roles.isEmpty
             ? _TaxonomyLoadStatus.empty
             : _TaxonomyLoadStatus.loaded;
+        _synchronizePersistedSelectionIfReady();
       });
     } on StageMasterDataAuthenticationException {
       _setRoleFailure(requestId, _TaxonomyLoadStatus.authenticationRequired);
@@ -137,6 +148,102 @@ class _StageProfileTaxonomySelectionScreenState
     );
   }
 
+  Future<void> _loadPersistedTaxonomy({bool showLoading = true}) async {
+    final requestId = ++_persistenceRequestId;
+    if (showLoading && mounted) {
+      setState(() => _persistenceStatus = _PersistenceLoadStatus.loading);
+    }
+
+    try {
+      final result = await _persistenceService.fetchMyStageTaxonomy(
+        PerformanceDomain.dance,
+      );
+      if (!mounted || requestId != _persistenceRequestId) return;
+      setState(() {
+        _persistedTaxonomy = result;
+        _persistenceStatus = _PersistenceLoadStatus.loaded;
+        _synchronizePersistedSelectionIfReady();
+      });
+    } on StageProfileTaxonomyPersistenceException catch (error, stackTrace) {
+      _logLoadFailure('saved taxonomy', error, stackTrace);
+      _setPersistenceFailure(
+        requestId,
+        error.kind ==
+                StageProfileTaxonomyPersistenceFailureKind
+                    .authenticationRequired
+            ? _PersistenceLoadStatus.authenticationRequired
+            : _PersistenceLoadStatus.rpcFailure,
+      );
+    } on StageProfileTaxonomyPersistenceParseException catch (
+      error,
+      stackTrace
+    ) {
+      _logLoadFailure('saved taxonomy', error, stackTrace);
+      _setPersistenceFailure(
+        requestId,
+        _PersistenceLoadStatus.parsingFailure,
+      );
+    } catch (error, stackTrace) {
+      _logLoadFailure('saved taxonomy', error, stackTrace);
+      _setPersistenceFailure(requestId, _PersistenceLoadStatus.rpcFailure);
+    }
+  }
+
+  void _setPersistenceFailure(
+    int requestId,
+    _PersistenceLoadStatus status,
+  ) {
+    if (!mounted || requestId != _persistenceRequestId) return;
+    setState(() {
+      _persistedTaxonomy = null;
+      _persistenceStatus = status;
+    });
+  }
+
+  void _synchronizePersistedSelectionIfReady() {
+    final persisted = _persistedTaxonomy;
+    if (_persistenceStatus != _PersistenceLoadStatus.loaded ||
+        _genreStatus != _TaxonomyLoadStatus.loaded ||
+        _roleStatus != _TaxonomyLoadStatus.loaded ||
+        persisted == null) {
+      return;
+    }
+
+    if (!_containsAllPersistedIds(persisted)) {
+      _persistenceStatus = _PersistenceLoadStatus.incompatibleMasterData;
+      return;
+    }
+
+    _applyAuthoritativeResult(persisted);
+    _persistenceStatus = _PersistenceLoadStatus.ready;
+  }
+
+  bool _containsAllPersistedIds(
+    StageProfileTaxonomyPersistenceResult result,
+  ) {
+    final activeGenreIds = _genres.map((genre) => genre.id).toSet();
+    final activeRoleIds = _roles.map((role) => role.id).toSet();
+    return result.genreIds.every(activeGenreIds.contains) &&
+        result.roleIds.every(activeRoleIds.contains) &&
+        (result.primaryRoleId == null ||
+            activeRoleIds.contains(result.primaryRoleId));
+  }
+
+  void _applyAuthoritativeResult(
+    StageProfileTaxonomyPersistenceResult result,
+  ) {
+    _preferredGenreOrder = List.unmodifiable(result.genreIds);
+    _preferredRoleOrder = List.unmodifiable(result.roleIds);
+    _selection = result.hasSavedTaxonomy
+        ? StageProfileTaxonomySelection(
+            selectedGenreIds: result.genreIds.toSet(),
+            selectedRoleIds: result.roleIds.toSet(),
+            primaryRoleId: result.primaryRoleId,
+          )
+        : StageProfileTaxonomySelection();
+    _validation = const StageProfileTaxonomyValidation();
+  }
+
   void _toggleGenre(String genreId) {
     setState(() {
       _selection = _selection.toggleGenre(genreId);
@@ -165,8 +272,8 @@ class _StageProfileTaxonomySelectionScreenState
     if (!validation.isValid) return;
 
     final draft = _selection.toDraft(
-      orderedGenreIds: _genres.map((genre) => genre.id).toList(growable: false),
-      orderedRoleIds: _roles.map((role) => role.id).toList(growable: false),
+      orderedGenreIds: _orderedSelectedGenreIds,
+      orderedRoleIds: _orderedSelectedRoleIds,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -174,14 +281,80 @@ class _StageProfileTaxonomySelectionScreenState
           draft: draft,
           genres: _genres,
           roles: _roles,
+          onSave: _saveTaxonomy,
         ),
       ),
     );
   }
 
+  Future<StageProfileTaxonomyDraft> _saveTaxonomy(
+    StageProfileTaxonomyDraft draft,
+  ) async {
+    final persisted = await _persistenceService.replaceMyStageTaxonomy(
+      domain: PerformanceDomain.dance,
+      draft: draft,
+    );
+    if (!_containsAllPersistedIds(persisted)) {
+      if (mounted) {
+        setState(
+          () => _persistenceStatus =
+              _PersistenceLoadStatus.incompatibleMasterData,
+        );
+      }
+      throw const StageProfileTaxonomyPersistenceParseException(
+        'Persisted taxonomy contains unavailable master IDs',
+      );
+    }
+    if (!persisted.hasSavedTaxonomy || persisted.primaryRoleId == null) {
+      throw const StageProfileTaxonomyPersistenceParseException(
+        'A successful save must return saved taxonomy',
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _persistedTaxonomy = persisted;
+        _applyAuthoritativeResult(persisted);
+        _persistenceStatus = _PersistenceLoadStatus.ready;
+      });
+    }
+
+    return StageProfileTaxonomyDraft(
+      selectedGenreIds: persisted.genreIds,
+      selectedRoleIds: persisted.roleIds,
+      primaryRoleId: persisted.primaryRoleId!,
+    );
+  }
+
+  List<String> get _orderedSelectedGenreIds => _orderedSelection(
+    preferred: _preferredGenreOrder,
+    available: _genres.map((genre) => genre.id),
+    selected: _selection.selectedGenreIds,
+  );
+
+  List<String> get _orderedSelectedRoleIds => _orderedSelection(
+    preferred: _preferredRoleOrder,
+    available: _roles.map((role) => role.id),
+    selected: _selection.selectedRoleIds,
+  );
+
+  List<String> _orderedSelection({
+    required List<String> preferred,
+    required Iterable<String> available,
+    required Set<String> selected,
+  }) {
+    final ordered = <String>[];
+    final included = <String>{};
+    for (final id in [...preferred, ...available]) {
+      if (selected.contains(id) && included.add(id)) ordered.add(id);
+    }
+    return List.unmodifiable(ordered);
+  }
+
   bool get _requiredDataAvailable =>
       _genreStatus == _TaxonomyLoadStatus.loaded &&
-      _roleStatus == _TaxonomyLoadStatus.loaded;
+      _roleStatus == _TaxonomyLoadStatus.loaded &&
+      _persistenceStatus == _PersistenceLoadStatus.ready;
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +376,10 @@ class _StageProfileTaxonomySelectionScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (_persistenceNotice != null) ...[
+                        _persistenceNotice!,
+                        const SizedBox(height: StageDesignTokens.space16),
+                      ],
                       Text(
                         '活動したいジャンルと役割を選んでください',
                         style: Theme.of(context).textTheme.headlineSmall,
@@ -235,7 +412,9 @@ class _StageProfileTaxonomySelectionScreenState
                                 selected: _selection.selectedGenreIds.contains(
                                   genre.id,
                                 ),
-                                onSelected: (_) => _toggleGenre(genre.id),
+                                onSelected: _requiredDataAvailable
+                                    ? (_) => _toggleGenre(genre.id)
+                                    : null,
                                 showCheckmark: true,
                                 selectedColor: StageDesignTokens.surfaceMuted,
                                 checkmarkColor: StageDesignTokens.purple,
@@ -272,7 +451,9 @@ class _StageProfileTaxonomySelectionScreenState
                                 selected: _selection.selectedRoleIds.contains(
                                   role.id,
                                 ),
-                                onSelected: (_) => _toggleRole(role.id),
+                                onSelected: _requiredDataAvailable
+                                    ? (_) => _toggleRole(role.id)
+                                    : null,
                                 showCheckmark: true,
                                 selectedColor: StageDesignTokens.surfaceMuted,
                                 checkmarkColor: StageDesignTokens.purple,
@@ -300,7 +481,9 @@ class _StageProfileTaxonomySelectionScreenState
                               .toList(growable: false),
                           primaryRoleId: _selection.primaryRoleId,
                           validationMessage: _validation.primaryRoleMessage,
-                          onSelected: _choosePrimaryRole,
+                          onSelected: _requiredDataAvailable
+                              ? _choosePrimaryRole
+                              : (_) {},
                         ),
                       ],
                     ],
@@ -338,6 +521,45 @@ class _StageProfileTaxonomySelectionScreenState
       ),
     );
   }
+
+  Widget? get _persistenceNotice {
+    return switch (_persistenceStatus) {
+      _PersistenceLoadStatus.loading => const StageCard(
+          key: ValueKey('profile-taxonomy-persistence-loading'),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              SizedBox(width: StageDesignTokens.space12),
+              Expanded(child: Text('保存済みの選択内容を読み込んでいます…')),
+            ],
+          ),
+        ),
+      _PersistenceLoadStatus.loaded || _PersistenceLoadStatus.ready => null,
+      _PersistenceLoadStatus.authenticationRequired => _PersistenceErrorCard(
+        message: 'プロフィールを読み込むにはログインが必要です。',
+        onRetry: _loadPersistedTaxonomy,
+      ),
+      _PersistenceLoadStatus.rpcFailure => _PersistenceErrorCard(
+        message: '保存済みのプロフィールを読み込めませんでした。時間をおいて再度お試しください。',
+        onRetry: _loadPersistedTaxonomy,
+      ),
+      _PersistenceLoadStatus.parsingFailure => _PersistenceErrorCard(
+        message: '保存済みのプロフィール情報を確認できませんでした。',
+        onRetry: _loadPersistedTaxonomy,
+      ),
+      _PersistenceLoadStatus.incompatibleMasterData => const StageCard(
+        key: ValueKey('profile-taxonomy-persistence-error'),
+        child: _SectionNotice(
+          icon: Icons.warning_amber_rounded,
+          message: '保存済みの選択肢に現在利用できない項目があります。内容を上書きせず、サポートへお問い合わせください。',
+        ),
+      ),
+    };
+  }
 }
 
 enum _TaxonomyLoadStatus {
@@ -347,6 +569,46 @@ enum _TaxonomyLoadStatus {
   authenticationRequired,
   rpcFailure,
   parsingFailure,
+}
+
+enum _PersistenceLoadStatus {
+  loading,
+  loaded,
+  ready,
+  authenticationRequired,
+  rpcFailure,
+  parsingFailure,
+  incompatibleMasterData,
+}
+
+class _PersistenceErrorCard extends StatelessWidget {
+  const _PersistenceErrorCard({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Future<void> Function({bool showLoading}) onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return StageCard(
+      key: const ValueKey('profile-taxonomy-persistence-error'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionNotice(icon: Icons.error_outline, message: message),
+          const SizedBox(height: StageDesignTokens.space12),
+          OutlinedButton.icon(
+            key: const ValueKey('profile-taxonomy-persistence-retry'),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('再試行'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SelectionSection extends StatelessWidget {

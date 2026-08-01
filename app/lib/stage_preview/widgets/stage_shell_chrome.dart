@@ -93,10 +93,12 @@ class StageBottomNavigation extends StatelessWidget {
     required this.currentTab,
     required this.onSelected,
     super.key,
+    this.tabs = StageTab.values,
   });
 
   final StageTab currentTab;
   final ValueChanged<StageTab> onSelected;
+  final List<StageTab> tabs;
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +111,7 @@ class StageBottomNavigation extends StatelessWidget {
         ),
       ),
       child: Row(
-        children: StageTab.values.map((tab) {
+        children: tabs.map((tab) {
           final selected = tab == currentTab;
           final color = selected
               ? StageDesignTokens.purple

@@ -44,7 +44,7 @@ void main() {
     },
   );
 
-  test('profile flow contains no persistence or write RPC path', () {
+  test('profile flow persists only through the typed RPC service', () {
     final sources = _readDartSources([
       'lib/stage_profile_flow',
       'lib/screens/stage_profile_taxonomy_selection_screen.dart',
@@ -53,12 +53,57 @@ void main() {
     ]);
 
     expect(sources, contains('StageMasterDataService'));
+    expect(sources, contains('StageProfileTaxonomyPersistenceService'));
+    expect(sources, contains('保存する'));
     expect(sources, isNot(contains('replace_my_performance_roles_v1')));
     expect(sources, isNot(contains('.insert(')));
     expect(sources, isNot(contains('.update(')));
     expect(sources, isNot(contains('.delete(')));
     expect(sources, isNot(contains('service_role')));
-    expect(sources, isNot(contains('保存する')));
+    expect(sources, isNot(contains('p_user_id')));
+    expect(sources, isNot(contains('p_auth_uid')));
+    expect(sources, isNot(contains('ProfileService')));
+    expect(sources, isNot(contains('ProfileEditData')));
+  });
+
+  test('authenticated app journey exposes the STAGE taxonomy flow', () {
+    final stageProfileAppSource = File(
+      'lib/stage_profile_flow/stage_profile_flow_app.dart',
+    ).readAsStringSync();
+    final appSource = File('lib/app.dart').readAsStringSync();
+    final shellSource = File(
+      'lib/stage_profile_flow/stage_authenticated_shell.dart',
+    ).readAsStringSync();
+    final myPageSource = File(
+      'lib/stage_profile_flow/stage_authenticated_my_page_screen.dart',
+    ).readAsStringSync();
+    final profileEditSource = File(
+      'lib/stage_profile_flow/stage_profile_edit_screen.dart',
+    ).readAsStringSync();
+
+    expect(stageProfileAppSource, contains('AuthGate'));
+    expect(stageProfileAppSource, contains('authenticatedHomeBuilder'));
+    expect(stageProfileAppSource, contains('StageAuthenticatedShell'));
+    expect(appSource, contains('widget.authenticatedHomeBuilder'));
+    expect(appSource, contains('const HomeScreen()'));
+    expect(shellSource, contains('StageAuthenticatedMyPageScreen'));
+    expect(shellSource, isNot(contains('const HomeScreen(')));
+    expect(shellSource, isNot(contains('BandMatch')));
+    expect(shellSource, isNot(contains('MemberListScreen')));
+    expect(myPageSource, contains('StageProfileEditScreen'));
+    expect(myPageSource, contains('_openProfileEdit'));
+    expect(profileEditSource, contains('StageProfileTaxonomySelectionScreen'));
+    expect(profileEditSource, contains('stage-profile-edit-taxonomy'));
+    expect(profileEditSource, isNot(contains('get_my_stage_taxonomy_v1')));
+    expect(profileEditSource, isNot(contains('replace_my_stage_taxonomy_v1')));
+  });
+
+  test('legacy BandMatch keeps its existing authenticated home', () {
+    final appSource = File('lib/app.dart').readAsStringSync();
+
+    expect(appSource, contains('const AuthGate()'));
+    expect(appSource, contains('const HomeScreen()'));
+    expect(appSource, contains('widget.authenticatedHomeBuilder'));
   });
 
   test('existing Preview stays isolated and taxonomy check stays present', () {

@@ -2,34 +2,104 @@ import 'package:flutter/material.dart';
 
 import '../models/stage_master_data.dart';
 import '../models/stage_profile_taxonomy_draft.dart';
+import '../models/stage_profile_taxonomy_persistence_result.dart';
+import '../services/stage_profile_taxonomy_persistence_service.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 
-class StageProfileTaxonomySummaryScreen extends StatelessWidget {
+typedef StageProfileTaxonomySaveCallback =
+    Future<StageProfileTaxonomyDraft> Function(
+      StageProfileTaxonomyDraft draft,
+    );
+
+class StageProfileTaxonomySummaryScreen extends StatefulWidget {
   const StageProfileTaxonomySummaryScreen({
     required this.draft,
     required this.genres,
     required this.roles,
+    required this.onSave,
     super.key,
   });
 
   final StageProfileTaxonomyDraft draft;
   final List<StageGenre> genres;
   final List<StagePerformanceRole> roles;
+  final StageProfileTaxonomySaveCallback onSave;
+
+  @override
+  State<StageProfileTaxonomySummaryScreen> createState() =>
+      _StageProfileTaxonomySummaryScreenState();
+}
+
+class _StageProfileTaxonomySummaryScreenState
+    extends State<StageProfileTaxonomySummaryScreen> {
+  late StageProfileTaxonomyDraft _draft;
+  bool _isSaving = false;
+  String? _errorMessage;
+  bool _hasSaved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _draft = widget.draft;
+  }
+
+  Future<void> _save() async {
+    if (_isSaving) return;
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+      _hasSaved = false;
+    });
+
+    try {
+      final persistedDraft = await widget.onSave(_draft);
+      if (!mounted) return;
+      setState(() {
+        _draft = persistedDraft;
+        _hasSaved = true;
+      });
+    } on StageProfileTaxonomyPersistenceException catch (error, stackTrace) {
+      _showSafeError(error.userMessage, error, stackTrace);
+    } on StageProfileTaxonomyPersistenceParseException catch (
+      error,
+      stackTrace
+    ) {
+      _showSafeError(error.userMessage, error, stackTrace);
+    } catch (error, stackTrace) {
+      _showSafeError(
+        'プロフィールを保存できませんでした。時間をおいて再度お試しください。',
+        error,
+        stackTrace,
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _showSafeError(
+    String message,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    debugPrint('STAGE profile taxonomy save failed: $error\n$stackTrace');
+    if (!mounted) return;
+    setState(() => _errorMessage = message);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final genresById = {for (final genre in genres) genre.id: genre};
-    final rolesById = {for (final role in roles) role.id: role};
-    final selectedGenres = draft.selectedGenreIds
+    final genresById = {for (final genre in widget.genres) genre.id: genre};
+    final rolesById = {for (final role in widget.roles) role.id: role};
+    final selectedGenres = _draft.selectedGenreIds
         .map((id) => genresById[id])
         .whereType<StageGenre>()
         .toList(growable: false);
-    final selectedRoles = draft.selectedRoleIds
+    final selectedRoles = _draft.selectedRoleIds
         .map((id) => rolesById[id])
         .whereType<StagePerformanceRole>()
         .toList(growable: false);
-    final primaryRole = rolesById[draft.primaryRoleId];
+    final primaryRole = rolesById[_draft.primaryRoleId];
 
     return Scaffold(
       appBar: AppBar(title: const Text('選択内容の確認')),
@@ -66,7 +136,14 @@ class StageProfileTaxonomySummaryScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'この内容はまだ保存されていません。',
+                              _hasSaved
+                                  ? 'プロフィールを保存しました。'
+                                  : '内容を確認して保存してください。',
+                              key: _hasSaved
+                                  ? const ValueKey(
+                                      'taxonomy-summary-save-success',
+                                    )
+                                  : null,
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(color: Colors.white),
                             ),
@@ -105,6 +182,30 @@ class StageProfileTaxonomySummaryScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: StageDesignTokens.space24),
+                      if (_errorMessage != null) ...[
+                        StageCard(
+                          key: const ValueKey('taxonomy-summary-save-error'),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                color: StageDesignTokens.error,
+                              ),
+                              const SizedBox(width: StageDesignTokens.space8),
+                              Expanded(child: Text(_errorMessage!)),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: StageDesignTokens.space16),
+                      ],
+                      StagePrimaryButton(
+                        key: const ValueKey('taxonomy-summary-save'),
+                        label: _isSaving ? '保存しています…' : '保存する',
+                        icon: Icons.save_outlined,
+                        onPressed: _isSaving ? null : _save,
+                      ),
+                      const SizedBox(height: StageDesignTokens.space12),
                       StageOutlinedButton(
                         key: const ValueKey('taxonomy-summary-back'),
                         label: '選び直す',

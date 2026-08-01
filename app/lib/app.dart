@@ -29,7 +29,9 @@ class BandMatchApp extends StatelessWidget {
 }
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, this.authenticatedHomeBuilder});
+
+  final WidgetBuilder? authenticatedHomeBuilder;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -152,7 +154,8 @@ class _AuthGateState extends State<AuthGate> {
       _GateState.passwordSetup => PasswordSetupScreen(
         onCompleted: _completePasswordRecovery,
       ),
-      _GateState.home => const HomeScreen(),
+      _GateState.home =>
+        widget.authenticatedHomeBuilder?.call(context) ?? const HomeScreen(),
       _GateState.error => _AuthGateError(
         error: _error!,
         onRetry: _resolveCurrentUser,

@@ -1,4 +1,5 @@
 import 'package:app/services/stage_master_data_service.dart';
+import 'package:app/services/stage_profile_taxonomy_persistence_service.dart';
 
 typedef FakeStageRpcFetcher =
     Future<dynamic> Function(
@@ -14,6 +15,33 @@ StageMasterDataService fakeStageService({
     rpcFetcher: fetcher,
     authenticationChecker: () => authenticated,
   );
+}
+
+StageProfileTaxonomyPersistenceService fakeStagePersistenceService({
+  StageProfileTaxonomyRpcFetcher? fetcher,
+  bool authenticated = true,
+}) {
+  return StageProfileTaxonomyPersistenceService(
+    rpcFetcher:
+        fetcher ??
+        (_, _) async => [stageTaxonomyResultRow(saved: false)],
+    authenticationChecker: () => authenticated,
+  );
+}
+
+Map<String, dynamic> stageTaxonomyResultRow({
+  bool saved = true,
+  List<String>? genreIds,
+  List<String>? roleIds,
+  String? primaryRoleId,
+}) {
+  return {
+    'domain': 'dance',
+    'has_saved_taxonomy': saved,
+    'genre_ids': genreIds ?? (saved ? [testUuid(1)] : <String>[]),
+    'role_ids': roleIds ?? (saved ? [testUuid(101)] : <String>[]),
+    'primary_role_id': primaryRoleId ?? (saved ? testUuid(101) : null),
+  };
 }
 
 const genreNames = [

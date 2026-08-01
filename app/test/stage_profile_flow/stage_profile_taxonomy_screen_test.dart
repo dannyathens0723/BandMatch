@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app/screens/stage_profile_taxonomy_selection_screen.dart';
 import 'package:app/services/stage_master_data_service.dart';
+import 'package:app/services/stage_profile_taxonomy_persistence_service.dart';
 import 'package:app/stage_preview/theme/stage_design_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,7 @@ void main() {
       );
 
       await _pumpScreen(tester, service, physicalSize: const Size(1600, 900));
+      await tester.pump();
 
       expect(find.text('読み込み中…'), findsNWidgets(2));
       expect(find.byType(CircularProgressIndicator), findsNWidgets(2));
@@ -431,6 +433,7 @@ Future<void> _pumpLoadedScreen(WidgetTester tester) {
 Future<void> _pumpScreen(
   WidgetTester tester,
   StageMasterDataService service, {
+  StageProfileTaxonomyPersistenceService? persistenceService,
   Size physicalSize = const Size(900, 1400),
 }) {
   tester.view.physicalSize = physicalSize;
@@ -440,7 +443,11 @@ Future<void> _pumpScreen(
   return tester.pumpWidget(
     MaterialApp(
       theme: StageDesignTokens.theme,
-      home: StageProfileTaxonomySelectionScreen(service: service),
+      home: StageProfileTaxonomySelectionScreen(
+        service: service,
+        persistenceService:
+            persistenceService ?? fakeStagePersistenceService(),
+      ),
     ),
   );
 }
@@ -448,9 +455,15 @@ Future<void> _pumpScreen(
 Future<void> _pumpScreenAndSettle(
   WidgetTester tester,
   StageMasterDataService service, {
+  StageProfileTaxonomyPersistenceService? persistenceService,
   Size physicalSize = const Size(900, 1400),
 }) async {
-  await _pumpScreen(tester, service, physicalSize: physicalSize);
+  await _pumpScreen(
+    tester,
+    service,
+    persistenceService: persistenceService,
+    physicalSize: physicalSize,
+  );
   await tester.pumpAndSettle();
 }
 

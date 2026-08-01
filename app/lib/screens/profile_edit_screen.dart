@@ -5,9 +5,19 @@ import '../models/master_data_item.dart';
 import '../services/master_data_service.dart';
 import '../services/profile_avatar_service.dart';
 import '../services/profile_service.dart';
+import 'stage_profile_taxonomy_selection_screen.dart';
+
+typedef ProfileEditInitialDataLoader = Future<MasterData> Function();
 
 class ProfileEditScreen extends StatefulWidget {
-  const ProfileEditScreen({super.key});
+  const ProfileEditScreen({
+    super.key,
+    this.stageTaxonomyBuilder,
+    this.initialDataLoader,
+  });
+
+  final WidgetBuilder? stageTaxonomyBuilder;
+  final ProfileEditInitialDataLoader? initialDataLoader;
 
   @override
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
@@ -16,8 +26,8 @@ class ProfileEditScreen extends StatefulWidget {
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
-  final _avatarService = ProfileAvatarService();
-  final _profileService = ProfileService();
+  ProfileAvatarService? _avatarService;
+  ProfileService? _profileService;
   final _partIds = <String>{};
   final _genreIds = <String>{};
   final _areaIds = <String>{};
@@ -31,7 +41,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   @override
   void initState() {
     super.initState();
-    _masterData = _loadInitialData();
+    _masterData = widget.initialDataLoader?.call() ?? _loadInitialData();
   }
 
   @override
@@ -41,9 +51,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<MasterData> _loadInitialData() async {
+    final profileService = _profileService ??= ProfileService();
     final results = await Future.wait([
       MasterDataService().fetchActiveMasterData(),
-      _profileService.fetchEditableProfile(),
+      profileService.fetchEditableProfile(),
     ]);
     final profile = results[1] as EditableProfile;
     _displayNameController.text = profile.displayName;
@@ -83,7 +94,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await _profileService.updateCurrentProfile(
+      final profileService = _profileService ??= ProfileService();
+      await profileService.updateCurrentProfile(
         ProfileEditData(
           displayName: _displayNameController.text.trim(),
           experienceLevel: _experienceLevel!,
@@ -110,7 +122,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
     setState(() => _isUploadingAvatar = true);
     try {
-      final result = await _avatarService.pickAndUploadAvatar();
+      final avatarService = _avatarService ??= ProfileAvatarService();
+      final result = await avatarService.pickAndUploadAvatar();
       if (!mounted) return;
       setState(() => _avatarUrl = result.avatarUrl);
       ScaffoldMessenger.of(
@@ -143,10 +156,30 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     };
   }
 
+  Future<void> _openStageTaxonomy() async {
+    final builder = widget.stageTaxonomyBuilder;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: builder ?? (_) => StageProfileTaxonomySelectionScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('プロフィール編集')),
+      appBar: AppBar(
+        title: const Text('プロフィール編集'),
+        actions: [
+          TextButton.icon(
+            key: const ValueKey('profile-edit-stage-taxonomy-open'),
+            onPressed: _openStageTaxonomy,
+            icon: const Icon(Icons.directions_run_outlined),
+            label: const Text('STAGE設定'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: FutureBuilder<MasterData>(
