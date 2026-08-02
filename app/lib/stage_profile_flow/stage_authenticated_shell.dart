@@ -8,17 +8,20 @@ import 'stage_authenticated_home_screen.dart';
 import 'stage_authenticated_my_page_screen.dart';
 import 'stage_crew_discovery_screen.dart';
 import 'stage_event_discovery_screen.dart';
+import 'stage_studio_discovery_screen.dart';
 
 class StageAuthenticatedShell extends StatefulWidget {
   const StageAuthenticatedShell({
     super.key,
     this.crewBuilder,
     this.stageBuilder,
+    this.studioBuilder,
     this.myPageBuilder,
   });
 
   final WidgetBuilder? crewBuilder;
   final WidgetBuilder? stageBuilder;
+  final WidgetBuilder? studioBuilder;
   final WidgetBuilder? myPageBuilder;
 
   @override
@@ -103,12 +106,11 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
                   const StageEventDiscoveryScreen()
             : const SizedBox.shrink(),
       StageTab.home => StageAuthenticatedHomeScreen(onSelectTab: _selectTab),
-      StageTab.studio => const StageMvpAreaScreen(
-        key: PageStorageKey('stage-auth-studio'),
-        icon: Icons.location_on_outlined,
-        title: 'スタジオ',
-        description: '練習場所を探し、候補を比較する場所です。',
-      ),
+      StageTab.studio =>
+        _visitedTabs.contains(StageTab.studio)
+            ? widget.studioBuilder?.call(context) ??
+                  const StageStudioDiscoveryScreen()
+            : const SizedBox.shrink(),
       StageTab.myPage =>
         widget.myPageBuilder?.call(context) ??
             const StageAuthenticatedMyPageScreen(),
