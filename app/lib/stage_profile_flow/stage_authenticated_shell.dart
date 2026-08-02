@@ -7,15 +7,18 @@ import '../stage_preview/widgets/stage_shell_chrome.dart';
 import 'stage_authenticated_home_screen.dart';
 import 'stage_authenticated_my_page_screen.dart';
 import 'stage_crew_discovery_screen.dart';
+import 'stage_event_discovery_screen.dart';
 
 class StageAuthenticatedShell extends StatefulWidget {
   const StageAuthenticatedShell({
     super.key,
     this.crewBuilder,
+    this.stageBuilder,
     this.myPageBuilder,
   });
 
   final WidgetBuilder? crewBuilder;
+  final WidgetBuilder? stageBuilder;
   final WidgetBuilder? myPageBuilder;
 
   @override
@@ -94,12 +97,11 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
             ? widget.crewBuilder?.call(context) ??
                   const StageCrewDiscoveryScreen()
             : const SizedBox.shrink(),
-      StageTab.stage => const StageMvpAreaScreen(
-        key: PageStorageKey('stage-auth-stage'),
-        icon: Icons.mic_none_outlined,
-        title: 'ステージ',
-        description: 'イベントやレッスンの情報を探す場所です。',
-      ),
+      StageTab.stage =>
+        _visitedTabs.contains(StageTab.stage)
+            ? widget.stageBuilder?.call(context) ??
+                  const StageEventDiscoveryScreen()
+            : const SizedBox.shrink(),
       StageTab.home => StageAuthenticatedHomeScreen(onSelectTab: _selectTab),
       StageTab.studio => const StageMvpAreaScreen(
         key: PageStorageKey('stage-auth-studio'),
