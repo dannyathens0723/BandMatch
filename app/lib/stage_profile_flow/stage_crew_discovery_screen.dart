@@ -1,25 +1,34 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/stage_crew_recruitment.dart';
+import '../models/stage_my_crew.dart';
 import '../services/stage_crew_discovery_service.dart';
+import '../services/stage_my_crew_service.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 import 'stage_crew_detail_screen.dart';
+import 'stage_my_crew_overview.dart';
 
-typedef StageCrewDetailBuilder = Widget Function(
-  BuildContext context,
-  StageCrewRecruitment recruitment,
-);
+typedef StageCrewDetailBuilder =
+    Widget Function(BuildContext context, StageCrewRecruitment recruitment);
 
 class StageCrewDiscoveryScreen extends StatefulWidget {
   const StageCrewDiscoveryScreen({
     super.key,
     this.repository,
     this.detailBuilder,
+    this.myCrewRepository,
+    this.myCrewDetailBuilder,
+    this.applicationDetailBuilder,
   });
 
   final StageCrewDiscoveryRepository? repository;
   final StageCrewDetailBuilder? detailBuilder;
+  final StageMyCrewRepository? myCrewRepository;
+  final StageMyCrewDetailBuilder? myCrewDetailBuilder;
+  final StageMyCrewApplicationDetailBuilder? applicationDetailBuilder;
 
   @override
   State<StageCrewDiscoveryScreen> createState() =>
@@ -29,8 +38,11 @@ class StageCrewDiscoveryScreen extends StatefulWidget {
 class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
   final _searchController = TextEditingController();
   late final StageCrewDiscoveryRepository _repository;
+  StageMyCrewRepository? _myCrewRepository;
   late Future<List<StageCrewRecruitment>> _recruitments;
+  Future<StageMyCrewOverview>? _myCrewOverview;
   String? _selectedGenre;
+  bool _showingMyCrew = false;
 
   @override
   void initState() {
@@ -50,78 +62,90 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
     return StagePageContent(
       key: const PageStorageKey('stage-auth-crew'),
       children: [
-        _DiscoverySegments(onMyCrew: _showMyCrewNotice),
-        const SizedBox(height: StageDesignTokens.space16),
-        TextField(
-          key: const ValueKey('stage-crew-search-field'),
-          controller: _searchController,
-          onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(
-            hintText: 'ジャンル・エリア・クルー名で検索',
-            prefixIcon: Icon(Icons.search_rounded),
-            filled: true,
-            fillColor: StageDesignTokens.surface,
-          ),
+        _DiscoverySegments(
+          showingMyCrew: _showingMyCrew,
+          onFind: _showDiscovery,
+          onMyCrew: _showMyCrew,
         ),
         const SizedBox(height: StageDesignTokens.space16),
-        FutureBuilder<List<StageCrewRecruitment>>(
-          future: _recruitments,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const _CrewLoadingState();
-            }
-            if (snapshot.hasError) {
-              return _CrewErrorState(onRetry: _retry);
-            }
+        if (!_showingMyCrew) ...[
+          TextField(
+            key: const ValueKey('stage-crew-search-field'),
+            controller: _searchController,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              hintText: 'ジャンル・エリア・クルー名で検索',
+              prefixIcon: Icon(Icons.search_rounded),
+              filled: true,
+              fillColor: StageDesignTokens.surface,
+            ),
+          ),
+          const SizedBox(height: StageDesignTokens.space16),
+          FutureBuilder<List<StageCrewRecruitment>>(
+            future: _recruitments,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const _CrewLoadingState();
+              }
+              if (snapshot.hasError) {
+                return _CrewErrorState(onRetry: _retry);
+              }
 
-            final recruitments = snapshot.data ?? const [];
-            if (recruitments.isEmpty) {
-              return const _CrewEmptyState();
-            }
+              final recruitments = snapshot.data ?? const [];
+              if (recruitments.isEmpty) {
+                return const _CrewEmptyState();
+              }
 
-            final genres = recruitments
-                .expand((item) => item.danceGenreNames)
-                .toSet()
-                .toList(growable: false)
-              ..sort();
-            final visibleRecruitments = recruitments
-                .where(
-                  (item) => item.matches(
-                    _searchController.text,
-                    _selectedGenre,
+              final genres =
+                  recruitments
+                      .expand((item) => item.danceGenreNames)
+                      .toSet()
+                      .toList(growable: false)
+                    ..sort();
+              final visibleRecruitments = recruitments
+                  .where(
+                    (item) =>
+                        item.matches(_searchController.text, _selectedGenre),
+                  )
+                  .toList(growable: false);
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _GenreFilters(
+                    genres: genres,
+                    selectedGenre: _selectedGenre,
+                    onSelected: (genre) {
+                      setState(() => _selectedGenre = genre);
+                    },
                   ),
-                )
-                .toList(growable: false);
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _GenreFilters(
-                  genres: genres,
-                  selectedGenre: _selectedGenre,
-                  onSelected: (genre) {
-                    setState(() => _selectedGenre = genre);
-                  },
-                ),
-                const SizedBox(height: StageDesignTokens.space16),
-                if (visibleRecruitments.isEmpty)
-                  const _FilteredEmptyState()
-                else
-                  ...visibleRecruitments.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: StageDesignTokens.space12,
-                      ),
-                      child: _CrewRecruitmentCard(
-                        recruitment: item,
-                        onTap: () => _openDetail(item),
+                  const SizedBox(height: StageDesignTokens.space16),
+                  if (visibleRecruitments.isEmpty)
+                    const _FilteredEmptyState()
+                  else
+                    ...visibleRecruitments.map(
+                      (item) => Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: StageDesignTokens.space12,
+                        ),
+                        child: _CrewRecruitmentCard(
+                          recruitment: item,
+                          onTap: () => _openDetail(item),
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            );
-          },
-        ),
+                ],
+              );
+            },
+          ),
+        ] else
+          StageMyCrewOverviewPanel(
+            future: _myCrewOverview!,
+            onRetry: _retryMyCrew,
+            onFindCrews: _showDiscovery,
+            onOpenCrew: _openMyCrewDetail,
+            onOpenApplication: _openApplicationDetail,
+          ),
       ],
     );
   }
@@ -135,25 +159,82 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
   Future<void> _openDetail(StageCrewRecruitment recruitment) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (context) => widget.detailBuilder?.call(
-              context,
-              recruitment,
-            ) ??
+        builder: (context) =>
+            widget.detailBuilder?.call(context, recruitment) ??
             StageCrewDetailScreen(recruitment: recruitment),
       ),
     );
   }
 
-  void _showMyCrewNotice() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('マイクルーは次のMVPステップで実装します')),
+  void _showDiscovery() {
+    setState(() => _showingMyCrew = false);
+  }
+
+  void _showMyCrew() {
+    if (_showingMyCrew) return;
+    final overview = _loadMyCrewOverview();
+    setState(() {
+      _showingMyCrew = true;
+      _myCrewOverview = overview;
+    });
+  }
+
+  void _retryMyCrew() {
+    final overview = _loadMyCrewOverview();
+    setState(() {
+      _myCrewOverview = overview;
+    });
+  }
+
+  Future<void> _openMyCrewDetail(StageMyCrew crew) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            widget.myCrewDetailBuilder?.call(context, crew) ??
+            StageMyCrewDetailScreen(crew: crew),
+      ),
     );
+  }
+
+  Future<void> _openApplicationDetail(
+    StageMyCrewApplication application,
+  ) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            widget.applicationDetailBuilder?.call(context, application) ??
+            StageMyCrewApplicationDetailScreen(application: application),
+      ),
+    );
+  }
+
+  StageMyCrewRepository get _myCrewRepositoryInstance =>
+      _myCrewRepository ??= widget.myCrewRepository ?? StageMyCrewService();
+
+  Future<StageMyCrewOverview> _loadMyCrewOverview() {
+    final completer = Completer<StageMyCrewOverview>();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        completer.complete(
+          await _myCrewRepositoryInstance.fetchMyCrewOverview(),
+        );
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    });
+    return completer.future;
   }
 }
 
 class _DiscoverySegments extends StatelessWidget {
-  const _DiscoverySegments({required this.onMyCrew});
+  const _DiscoverySegments({
+    required this.showingMyCrew,
+    required this.onFind,
+    required this.onMyCrew,
+  });
 
+  final bool showingMyCrew;
+  final VoidCallback onFind;
   final VoidCallback onMyCrew;
 
   @override
@@ -161,22 +242,37 @@ class _DiscoverySegments extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: FilledButton(
-            key: const ValueKey('stage-crew-find-segment'),
-            style: FilledButton.styleFrom(
-              backgroundColor: StageDesignTokens.charcoal,
-            ),
-            onPressed: () {},
-            child: const Text('さがす'),
-          ),
+          child: showingMyCrew
+              ? OutlinedButton(
+                  key: const ValueKey('stage-crew-find-segment'),
+                  onPressed: onFind,
+                  child: const Text('さがす'),
+                )
+              : FilledButton(
+                  key: const ValueKey('stage-crew-find-segment'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: StageDesignTokens.charcoal,
+                  ),
+                  onPressed: onFind,
+                  child: const Text('さがす'),
+                ),
         ),
         const SizedBox(width: StageDesignTokens.space8),
         Expanded(
-          child: OutlinedButton(
-            key: const ValueKey('stage-crew-mine-segment'),
-            onPressed: onMyCrew,
-            child: const Text('マイクルー'),
-          ),
+          child: showingMyCrew
+              ? FilledButton(
+                  key: const ValueKey('stage-crew-mine-segment'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: StageDesignTokens.charcoal,
+                  ),
+                  onPressed: onMyCrew,
+                  child: const Text('マイクルー'),
+                )
+              : OutlinedButton(
+                  key: const ValueKey('stage-crew-mine-segment'),
+                  onPressed: onMyCrew,
+                  child: const Text('マイクルー'),
+                ),
         ),
       ],
     );
@@ -220,10 +316,7 @@ class _GenreFilters extends StatelessWidget {
 }
 
 class _CrewRecruitmentCard extends StatelessWidget {
-  const _CrewRecruitmentCard({
-    required this.recruitment,
-    required this.onTap,
-  });
+  const _CrewRecruitmentCard({required this.recruitment, required this.onTap});
 
   final StageCrewRecruitment recruitment;
   final VoidCallback onTap;
@@ -304,10 +397,7 @@ class _MetadataWrap extends StatelessWidget {
       children: [
         ...genres.map((genre) => StageTag(genre)),
         ...areas.map(
-          (area) => StageTag(
-            area,
-            color: StageDesignTokens.textSecondary,
-          ),
+          (area) => StageTag(area, color: StageDesignTokens.textSecondary),
         ),
       ],
     );
