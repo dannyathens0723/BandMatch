@@ -26,6 +26,16 @@ class StageActivity {
   bool get requiresAttention =>
       activityType == 'managed_application' && activityStatus == 'pending';
 
+  String? get announcementId {
+    const prefix = 'crew_announcement:';
+    if (activityType != 'crew_announcement' ||
+        !activityKey.startsWith(prefix)) {
+      return null;
+    }
+    final value = activityKey.substring(prefix.length);
+    return value.isEmpty ? null : value;
+  }
+
   factory StageActivity.fromJson(Map<String, dynamic> json) {
     return StageActivity(
       activityKey: json['activity_key'] as String,

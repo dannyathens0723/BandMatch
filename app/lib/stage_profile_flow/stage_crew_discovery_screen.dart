@@ -10,6 +10,7 @@ import '../services/stage_my_crew_service.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 import 'stage_crew_detail_screen.dart';
+import 'stage_crew_home_screen.dart';
 import 'stage_crew_management_screens.dart';
 import 'stage_my_crew_overview.dart';
 
@@ -63,6 +64,7 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
   StageMyCrewRepository? _myCrewRepository;
   late Future<List<StageCrewRecruitment>> _recruitments;
   Future<StageMyCrewOverview>? _myCrewOverview;
+  StageMyCrewOverview? _lastMyCrewOverview;
   StageCrewManagementRepository? _managementRepository;
   String? _selectedGenre;
   bool _showingMyCrew = false;
@@ -247,12 +249,10 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
       MaterialPageRoute<void>(
         builder: (context) =>
             widget.myCrewDetailBuilder?.call(context, crew) ??
-            (crew.isManaged
-                ? StageManagedCrewScreen(
-                    crew: crew,
-                    repository: _managementRepositoryInstance,
-                  )
-                : StageMyCrewDetailScreen(crew: crew)),
+            StageCrewHomeScreen(
+              initialCrew: crew,
+              availableCrews: _lastMyCrewOverview?.crews ?? [crew],
+            ),
       ),
     );
     _refreshAll();
@@ -300,7 +300,10 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         completer.complete(
-          await _myCrewRepositoryInstance.fetchMyCrewOverview(),
+          await _myCrewRepositoryInstance.fetchMyCrewOverview().then((value) {
+            _lastMyCrewOverview = value;
+            return value;
+          }),
         );
       } catch (error, stackTrace) {
         completer.completeError(error, stackTrace);

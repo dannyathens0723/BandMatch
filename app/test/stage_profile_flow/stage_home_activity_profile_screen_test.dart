@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:app/models/stage_activity.dart';
+import 'package:app/models/stage_crew_activity.dart';
 import 'package:app/models/stage_home_dashboard.dart';
 import 'package:app/models/stage_my_crew.dart';
 import 'package:app/models/stage_user_profile.dart';
 import 'package:app/services/stage_activity_service.dart';
+import 'package:app/services/stage_crew_activity_service.dart';
 import 'package:app/services/stage_home_dashboard_service.dart';
 import 'package:app/services/stage_profile_service.dart';
 import 'package:app/stage_preview/navigation/stage_tab.dart';
@@ -13,6 +15,7 @@ import 'package:app/stage_profile_flow/stage_activity_center_screen.dart';
 import 'package:app/stage_profile_flow/stage_authenticated_home_screen.dart';
 import 'package:app/stage_profile_flow/stage_authenticated_my_page_screen.dart';
 import 'package:app/stage_profile_flow/stage_authenticated_shell.dart';
+import 'package:app/stage_profile_flow/stage_crew_announcement_detail_screen.dart';
 import 'package:app/stage_profile_flow/stage_profile_edit_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -100,6 +103,82 @@ void main() {
       );
       expect(openedMyCrew, isTrue);
     });
+
+    testWidgets('Crew activity opens its authoritative Crew context', (
+      tester,
+    ) async {
+      String? openedCrewId;
+      await _pumpHome(
+        tester,
+        repository: _DashboardRepository([
+          _dashboard(
+            activity: StageDashboardSection.data([_crewPracticeActivity]),
+          ),
+        ]),
+        onOpenCrew: (crewId) => openedCrewId = crewId,
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const ValueKey('stage-home-crew-activity-crew_practice:practice-1'),
+        ),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(
+        find.byKey(
+          const ValueKey('stage-home-crew-activity-crew_practice:practice-1'),
+        ),
+      );
+
+      expect(openedCrewId, 'crew-1');
+    });
+
+    testWidgets(
+      'announcement activity opens exact authorized detail and back',
+      (tester) async {
+        final announcementRepository = _CrewActivityRepository(
+          snapshot: _announcementSnapshot,
+        );
+        await _pumpHome(
+          tester,
+          repository: _DashboardRepository([
+            _dashboard(
+              activity: StageDashboardSection.data([_announcementActivity]),
+            ),
+          ]),
+          announcementRepository: announcementRepository,
+        );
+
+        final card = find.byKey(
+          const ValueKey(
+            'stage-home-crew-activity-crew_announcement:announcement-1',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          card,
+          300,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await tester.tap(card);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('stage-crew-announcement-detail')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('stage-crew-announcement-announcement-1')),
+          findsOneWidget,
+        );
+        expect(find.text('Authoritative announcement body'), findsOneWidget);
+        expect(announcementRepository.crewIds, ['crew-1']);
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(card, findsOneWidget);
+      },
+    );
   });
 
   group('STAGE activity center', () {
@@ -204,6 +283,76 @@ void main() {
       expect(find.text('OPEN'), findsOneWidget);
     });
 
+    testWidgets(
+      'announcement opens exact detail and back returns to Activity Center',
+      (tester) async {
+        final announcementRepository = _CrewActivityRepository(
+          snapshot: _announcementSnapshot,
+        );
+        await _pumpActivity(
+          tester,
+          _ActivityRepository([
+            () async => [_announcementActivity],
+          ]),
+          announcementRepository: announcementRepository,
+        );
+
+        await tester.tap(
+          find.byKey(
+            const ValueKey('stage-activity-crew_announcement:announcement-1'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('stage-crew-announcement-detail')),
+          findsOneWidget,
+        );
+        expect(announcementRepository.crewIds, ['crew-1']);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('stage-activity-center')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets('unavailable announcement detail fails without backend text', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: StageDesignTokens.theme,
+          home: StageCrewAnnouncementDetailScreen(
+            crewId: 'crew-1',
+            crewName: 'Prism',
+            announcementId: 'missing-announcement',
+            repository: _CrewActivityRepository(
+              snapshot: const StageCrewActivitySnapshot(
+                isAdmin: false,
+                practices: [],
+                polls: [],
+                announcements: [],
+                resources: [],
+                targets: [],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('stage-crew-announcement-unavailable')),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Announcement is not available'),
+        findsNothing,
+      );
+    });
+
     testWidgets('wide activity route keeps the shared mobile canvas', (
       tester,
     ) async {
@@ -291,6 +440,8 @@ Future<void> _pumpHome(
   required StageHomeDashboardRepository repository,
   ValueChanged<StageTab>? onSelectTab,
   VoidCallback? onOpenMyCrew,
+  ValueChanged<String>? onOpenCrew,
+  StageCrewActivityRepository? announcementRepository,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -300,6 +451,8 @@ Future<void> _pumpHome(
           repository: repository,
           onSelectTab: onSelectTab ?? (_) {},
           onOpenMyCrew: onOpenMyCrew,
+          onOpenCrew: onOpenCrew,
+          announcementRepository: announcementRepository,
         ),
       ),
     ),
@@ -309,12 +462,16 @@ Future<void> _pumpHome(
 
 Future<void> _pumpActivity(
   WidgetTester tester,
-  StageActivityRepository repository,
-) async {
+  StageActivityRepository repository, {
+  StageCrewActivityRepository? announcementRepository,
+}) async {
   await tester.pumpWidget(
     MaterialApp(
       theme: StageDesignTokens.theme,
-      home: StageActivityCenterScreen(repository: repository),
+      home: StageActivityCenterScreen(
+        repository: repository,
+        announcementRepository: announcementRepository,
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -403,6 +560,49 @@ final _managerActivity = StageActivity(
   actorDisplayName: 'Aya',
 );
 
+final _crewPracticeActivity = StageActivity(
+  activityKey: 'crew_practice:practice-1',
+  activityType: 'crew_practice',
+  activityStatus: 'scheduled',
+  occurredAt: DateTime(2026, 8, 3, 12),
+  crewId: 'crew-1',
+  crewName: 'Prism',
+  postId: null,
+  postTitle: '8月10日 リハーサル',
+  applicationId: null,
+  actorDisplayName: null,
+);
+
+final _announcementActivity = StageActivity(
+  activityKey: 'crew_announcement:announcement-1',
+  activityType: 'crew_announcement',
+  activityStatus: 'published',
+  occurredAt: DateTime(2026, 8, 3, 13),
+  crewId: 'crew-1',
+  crewName: 'Prism',
+  postId: null,
+  postTitle: 'Important announcement',
+  applicationId: null,
+  actorDisplayName: null,
+);
+
+const _announcement = StageCrewAnnouncement(
+  announcementId: 'announcement-1',
+  title: 'Important announcement',
+  status: 'published',
+  body: 'Authoritative announcement body',
+  authorDisplayName: 'Mio',
+);
+
+const _announcementSnapshot = StageCrewActivitySnapshot(
+  isAdmin: false,
+  practices: [],
+  polls: [],
+  announcements: [_announcement],
+  resources: [],
+  targets: [],
+);
+
 class _DashboardRepository implements StageHomeDashboardRepository {
   _DashboardRepository(this.responses);
 
@@ -429,6 +629,22 @@ class _ActivityRepository implements StageActivityRepository {
     calls++;
     return responses[index]();
   }
+}
+
+class _CrewActivityRepository implements StageCrewActivityRepository {
+  _CrewActivityRepository({required this.snapshot});
+
+  final StageCrewActivitySnapshot snapshot;
+  final List<String> crewIds = [];
+
+  @override
+  Future<StageCrewActivitySnapshot> fetchCrewActivity(String crewId) async {
+    crewIds.add(crewId);
+    return snapshot;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _ProfileRepository implements StageProfileRepository {

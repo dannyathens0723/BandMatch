@@ -2,18 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../models/stage_activity.dart';
 import '../services/stage_activity_service.dart';
+import '../services/stage_crew_activity_service.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
+import 'stage_crew_announcement_detail_screen.dart';
 
 class StageActivityCenterScreen extends StatefulWidget {
   const StageActivityCenterScreen({
     super.key,
     this.repository,
     this.onOpenCrewArea,
+    this.onOpenCrew,
+    this.announcementRepository,
   });
 
   final StageActivityRepository? repository;
   final VoidCallback? onOpenCrewArea;
+  final ValueChanged<String>? onOpenCrew;
+  final StageCrewActivityRepository? announcementRepository;
 
   @override
   State<StageActivityCenterScreen> createState() =>
@@ -88,15 +94,7 @@ class _StageActivityCenterScreenState extends State<StageActivityCenterScreen> {
                     padding: const EdgeInsets.only(
                       bottom: StageDesignTokens.space12,
                     ),
-                    child: _ActivityCard(
-                      item: item,
-                      onTap: widget.onOpenCrewArea == null
-                          ? null
-                          : () {
-                              Navigator.of(context).pop();
-                              widget.onOpenCrewArea!();
-                            },
-                    ),
+                    child: _ActivityCard(item: item, onTap: _onTap(item)),
                   ),
                 ),
               ],
@@ -112,6 +110,29 @@ class _StageActivityCenterScreenState extends State<StageActivityCenterScreen> {
     setState(() {
       _activity = activity;
     });
+  }
+
+  VoidCallback? _onTap(StageActivity item) {
+    final announcementId = item.announcementId;
+    if (announcementId != null) {
+      return () => openStageCrewAnnouncementDetail(
+        context,
+        crewId: item.crewId,
+        crewName: item.crewName,
+        announcementId: announcementId,
+        repository: widget.announcementRepository,
+      );
+    }
+    if (widget.onOpenCrew == null && widget.onOpenCrewArea == null) return null;
+    return () {
+      Navigator.of(context).pop();
+      final openCrew = widget.onOpenCrew;
+      if (openCrew != null) {
+        openCrew(item.crewId);
+      } else {
+        widget.onOpenCrewArea!();
+      }
+    };
   }
 }
 
@@ -198,6 +219,10 @@ class _ActivityError extends StatelessWidget {
 }
 
 IconData _icon(StageActivity item) => switch (item.activityType) {
+  'crew_practice' => Icons.event_available_outlined,
+  'crew_poll' => Icons.how_to_vote_outlined,
+  'crew_announcement' => Icons.campaign_outlined,
+  'crew_resource' => Icons.folder_open_outlined,
   'managed_application' => Icons.person_add_alt_1_outlined,
   'crew_membership' => Icons.groups_outlined,
   _ => switch (item.activityStatus) {
@@ -208,6 +233,11 @@ IconData _icon(StageActivity item) => switch (item.activityType) {
 };
 
 String _title(StageActivity item) => switch (item.activityType) {
+  'crew_practice' => '練習予定が更新されました',
+  'crew_poll' when item.activityStatus == 'open' => '日程調整の回答を確認してください',
+  'crew_poll' => '日程調整が確定しました',
+  'crew_announcement' => 'クルーからのお知らせ',
+  'crew_resource' => '新しい練習資料があります',
   'managed_application' when item.activityStatus == 'pending' => '新しい応募があります',
   'managed_application' => '応募の対応状況が更新されました',
   'crew_membership' => 'クルーに参加しています',
@@ -226,6 +256,10 @@ String _description(StageActivity item) {
   }
   if (item.activityType == 'crew_membership') {
     return '${item.crewName}の参加状況をマイクルーで確認できます。';
+  }
+  if (item.activityType.startsWith('crew_')) {
+    final title = item.postTitle == null ? '' : '「${item.postTitle}」';
+    return '${item.crewName} $title';
   }
   return '${item.crewName} $post';
 }

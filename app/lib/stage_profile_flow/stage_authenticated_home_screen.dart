@@ -5,12 +5,14 @@ import '../models/stage_crew_recruitment.dart';
 import '../models/stage_event.dart';
 import '../models/stage_home_dashboard.dart';
 import '../models/stage_studio.dart';
+import '../services/stage_crew_activity_service.dart';
 import '../services/stage_event_discovery_service.dart';
 import '../services/stage_home_dashboard_service.dart';
 import '../services/stage_studio_discovery_service.dart';
 import '../stage_preview/navigation/stage_tab.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
+import 'stage_crew_announcement_detail_screen.dart';
 import 'stage_crew_detail_screen.dart';
 import 'stage_event_detail_screen.dart';
 import 'stage_studio_detail_screen.dart';
@@ -22,12 +24,16 @@ class StageAuthenticatedHomeScreen extends StatefulWidget {
     this.repository,
     this.refreshToken = 0,
     this.onOpenMyCrew,
+    this.onOpenCrew,
+    this.announcementRepository,
   });
 
   final ValueChanged<StageTab> onSelectTab;
   final StageHomeDashboardRepository? repository;
   final int refreshToken;
   final VoidCallback? onOpenMyCrew;
+  final ValueChanged<String>? onOpenCrew;
+  final StageCrewActivityRepository? announcementRepository;
 
   @override
   State<StageAuthenticatedHomeScreen> createState() =>
@@ -73,6 +79,9 @@ class _StageAuthenticatedHomeScreenState
     final profile = dashboard.profile.data;
     final myCrew = dashboard.myCrew.data;
     final activity = dashboard.activity.data ?? const <StageActivity>[];
+    final crewActivity = activity
+        .where((item) => item.activityType.startsWith('crew_'))
+        .toList(growable: false);
     final recruitments =
         dashboard.recruitments.data ?? const <StageCrewRecruitment>[];
     final events = dashboard.events.data ?? const <StageEvent>[];
@@ -151,9 +160,7 @@ class _StageAuthenticatedHomeScreenState
                     ),
                     child: StageCard(
                       key: ValueKey('stage-home-attention-${item.activityKey}'),
-                      onTap:
-                          widget.onOpenMyCrew ??
-                          () => widget.onSelectTab(StageTab.crew),
+                      onTap: () => _openCrewActivity(item),
                       color: const Color(0xFFFFF2F6),
                       borderColor: const Color(0xFFFFC8D9),
                       child: Row(
@@ -171,6 +178,36 @@ class _StageAuthenticatedHomeScreenState
                           ),
                           const Icon(Icons.chevron_right_rounded),
                         ],
+                      ),
+                    ),
+                  ),
+                ),
+          ],
+          if (crewActivity.isNotEmpty) ...[
+            const StageSectionHeader(title: 'クルーの最新情報'),
+            ...crewActivity
+                .take(3)
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: StageDesignTokens.space12,
+                    ),
+                    child: StageCard(
+                      key: ValueKey(
+                        'stage-home-crew-activity-${item.activityKey}',
+                      ),
+                      onTap: () => _openCrewActivity(item),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          _crewActivityIcon(item.activityType),
+                          color: StageDesignTokens.purple,
+                        ),
+                        title: Text(item.postTitle ?? item.crewName),
+                        subtitle: Text(
+                          '${item.crewName} ・ ${_crewActivityLabel(item.activityType, item.activityStatus)}',
+                        ),
+                        trailing: const Icon(Icons.chevron_right_rounded),
                       ),
                     ),
                   ),
@@ -285,6 +322,28 @@ class _StageAuthenticatedHomeScreenState
       ),
     );
     await _load(showLoading: false);
+  }
+
+  Future<void> _openCrewActivity(StageActivity item) async {
+    final announcementId = item.announcementId;
+    if (announcementId != null) {
+      await openStageCrewAnnouncementDetail(
+        context,
+        crewId: item.crewId,
+        crewName: item.crewName,
+        announcementId: announcementId,
+        repository: widget.announcementRepository,
+      );
+      return;
+    }
+    final openCrew = widget.onOpenCrew;
+    if (openCrew != null) {
+      openCrew(item.crewId);
+    } else if (widget.onOpenMyCrew != null) {
+      widget.onOpenMyCrew!();
+    } else {
+      widget.onSelectTab(StageTab.crew);
+    }
   }
 
   Future<void> _openEvent(StageEvent event) async {
@@ -481,6 +540,22 @@ class _HomeCrewCard extends StatelessWidget {
     );
   }
 }
+
+IconData _crewActivityIcon(String type) => switch (type) {
+  'crew_practice' => Icons.event_available_outlined,
+  'crew_poll' => Icons.how_to_vote_outlined,
+  'crew_announcement' => Icons.campaign_outlined,
+  'crew_resource' => Icons.folder_open_outlined,
+  _ => Icons.groups_outlined,
+};
+
+String _crewActivityLabel(String type, String status) => switch (type) {
+  'crew_practice' => status == 'cancelled' ? '練習中止' : '練習予定',
+  'crew_poll' => status == 'open' ? '回答受付中' : '日程確定',
+  'crew_announcement' => 'お知らせ',
+  'crew_resource' => '練習資料',
+  _ => 'クルー活動',
+};
 
 class _HomeEventCard extends StatelessWidget {
   const _HomeEventCard({required this.event, required this.onTap});

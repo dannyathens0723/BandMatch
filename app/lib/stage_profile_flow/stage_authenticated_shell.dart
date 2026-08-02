@@ -4,10 +4,12 @@ import '../stage_preview/navigation/stage_tab.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 import '../stage_preview/widgets/stage_shell_chrome.dart';
+import '../services/stage_my_crew_service.dart';
 import 'stage_activity_center_screen.dart';
 import 'stage_authenticated_home_screen.dart';
 import 'stage_authenticated_my_page_screen.dart';
 import 'stage_crew_discovery_screen.dart';
+import 'stage_crew_home_screen.dart';
 import 'stage_event_discovery_screen.dart';
 import 'stage_studio_discovery_screen.dart';
 
@@ -118,6 +120,7 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
               onSelectTab: _selectTab,
               refreshToken: _refreshToken,
               onOpenMyCrew: _openMyCrew,
+              onOpenCrew: _openCrewFromActivity,
             ),
       StageTab.studio =>
         _visitedTabs.contains(StageTab.studio)
@@ -150,7 +153,10 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
   Future<void> _openActivityCenter() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => StageActivityCenterScreen(onOpenCrewArea: _openMyCrew),
+        builder: (_) => StageActivityCenterScreen(
+          onOpenCrewArea: _openMyCrew,
+          onOpenCrew: _openCrewFromActivity,
+        ),
       ),
     );
     if (mounted) setState(() => _refreshToken++);
@@ -165,6 +171,32 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
   void _openMyCrew() {
     _crewController.showMyCrew();
     _selectTab(StageTab.crew);
+  }
+
+  Future<void> _openCrewFromActivity(String crewId) async {
+    try {
+      final overview = await StageMyCrewService().fetchMyCrewOverview();
+      if (!mounted) return;
+      final matching = overview.crews.where((item) => item.crewId == crewId);
+      final crew = matching.isEmpty ? null : matching.first;
+      if (crew == null) {
+        _openMyCrew();
+        return;
+      }
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => StageCrewHomeScreen(
+            initialCrew: crew,
+            availableCrews: overview.crews,
+          ),
+        ),
+      );
+      if (mounted) setState(() => _refreshToken++);
+    } catch (error, stackTrace) {
+      debugPrint('STAGE Crew activity navigation failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) _openMyCrew();
+    }
   }
 }
 
