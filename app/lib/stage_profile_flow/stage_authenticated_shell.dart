@@ -4,6 +4,7 @@ import '../stage_preview/navigation/stage_tab.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 import '../stage_preview/widgets/stage_shell_chrome.dart';
+import 'stage_activity_center_screen.dart';
 import 'stage_authenticated_home_screen.dart';
 import 'stage_authenticated_my_page_screen.dart';
 import 'stage_crew_discovery_screen.dart';
@@ -14,12 +15,14 @@ class StageAuthenticatedShell extends StatefulWidget {
   const StageAuthenticatedShell({
     super.key,
     this.crewBuilder,
+    this.homeBuilder,
     this.stageBuilder,
     this.studioBuilder,
     this.myPageBuilder,
   });
 
   final WidgetBuilder? crewBuilder;
+  final WidgetBuilder? homeBuilder;
   final WidgetBuilder? stageBuilder;
   final WidgetBuilder? studioBuilder;
   final WidgetBuilder? myPageBuilder;
@@ -40,6 +43,15 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
 
   StageTab _currentTab = StageTab.home;
   final Set<StageTab> _visitedTabs = {StageTab.home};
+  final StageCrewDiscoveryController _crewController =
+      StageCrewDiscoveryController();
+  int _refreshToken = 0;
+
+  @override
+  void dispose() {
+    _crewController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,14 +73,9 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
                       title: _currentTab.label,
                       isHome: _currentTab == StageTab.home,
                       onLogoTap: () => _selectTab(StageTab.home),
-                      onNotifications: () => _openPlaceholder(
-                        title: '通知',
-                        icon: Icons.notifications_none_rounded,
-                      ),
-                      onMessages: () => _openPlaceholder(
-                        title: 'メッセージ',
-                        icon: Icons.mail_outline_rounded,
-                      ),
+                      showNotificationBadge: false,
+                      onNotifications: _openActivityCenter,
+                      onMessages: _showMessagesComingSoon,
                     ),
                     Expanded(
                       child: IndexedStack(
@@ -98,14 +105,20 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
       StageTab.crew =>
         _visitedTabs.contains(StageTab.crew)
             ? widget.crewBuilder?.call(context) ??
-                  const StageCrewDiscoveryScreen()
+                  StageCrewDiscoveryScreen(controller: _crewController)
             : const SizedBox.shrink(),
       StageTab.stage =>
         _visitedTabs.contains(StageTab.stage)
             ? widget.stageBuilder?.call(context) ??
                   const StageEventDiscoveryScreen()
             : const SizedBox.shrink(),
-      StageTab.home => StageAuthenticatedHomeScreen(onSelectTab: _selectTab),
+      StageTab.home =>
+        widget.homeBuilder?.call(context) ??
+            StageAuthenticatedHomeScreen(
+              onSelectTab: _selectTab,
+              refreshToken: _refreshToken,
+              onOpenMyCrew: _openMyCrew,
+            ),
       StageTab.studio =>
         _visitedTabs.contains(StageTab.studio)
             ? widget.studioBuilder?.call(context) ??
@@ -113,24 +126,45 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
             : const SizedBox.shrink(),
       StageTab.myPage =>
         widget.myPageBuilder?.call(context) ??
-            const StageAuthenticatedMyPageScreen(),
+            StageAuthenticatedMyPageScreen(
+              refreshToken: _refreshToken,
+              onOpenCrewArea: _openMyCrew,
+            ),
     };
   }
 
   void _selectTab(StageTab tab) {
-    if (tab == _currentTab) return;
+    if (tab == _currentTab) {
+      if (tab == StageTab.home || tab == StageTab.myPage) {
+        setState(() => _refreshToken++);
+      }
+      return;
+    }
     setState(() {
       _visitedTabs.add(tab);
       _currentTab = tab;
+      if (tab == StageTab.home || tab == StageTab.myPage) _refreshToken++;
     });
   }
 
-  void _openPlaceholder({required String title, required IconData icon}) {
-    Navigator.of(context).push(
+  Future<void> _openActivityCenter() async {
+    await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => _StageGlobalPlaceholderScreen(title: title, icon: icon),
+        builder: (_) => StageActivityCenterScreen(onOpenCrewArea: _openMyCrew),
       ),
     );
+    if (mounted) setState(() => _refreshToken++);
+  }
+
+  void _showMessagesComingSoon() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('メッセージ機能は現在準備中です。')));
+  }
+
+  void _openMyCrew() {
+    _crewController.showMyCrew();
+    _selectTab(StageTab.crew);
   }
 }
 
@@ -179,28 +213,6 @@ class StageMvpAreaScreen extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _StageGlobalPlaceholderScreen extends StatelessWidget {
-  const _StageGlobalPlaceholderScreen({
-    required this.title,
-    required this.icon,
-  });
-
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: StageMvpAreaScreen(
-        icon: icon,
-        title: title,
-        description: 'この機能はSTAGE MVPの次のステップで接続します。',
-      ),
     );
   }
 }

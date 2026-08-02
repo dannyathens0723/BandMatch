@@ -42,8 +42,7 @@ class _StageProfileTaxonomySelectionScreenState
   List<String> _preferredGenreOrder = const [];
   List<String> _preferredRoleOrder = const [];
   StageProfileTaxonomyPersistenceResult? _persistedTaxonomy;
-  _PersistenceLoadStatus _persistenceStatus =
-      _PersistenceLoadStatus.loading;
+  _PersistenceLoadStatus _persistenceStatus = _PersistenceLoadStatus.loading;
   int _genreRequestId = 0;
   int _roleRequestId = 0;
   int _persistenceRequestId = 0;
@@ -179,20 +178,14 @@ class _StageProfileTaxonomySelectionScreenState
       stackTrace
     ) {
       _logLoadFailure('saved taxonomy', error, stackTrace);
-      _setPersistenceFailure(
-        requestId,
-        _PersistenceLoadStatus.parsingFailure,
-      );
+      _setPersistenceFailure(requestId, _PersistenceLoadStatus.parsingFailure);
     } catch (error, stackTrace) {
       _logLoadFailure('saved taxonomy', error, stackTrace);
       _setPersistenceFailure(requestId, _PersistenceLoadStatus.rpcFailure);
     }
   }
 
-  void _setPersistenceFailure(
-    int requestId,
-    _PersistenceLoadStatus status,
-  ) {
+  void _setPersistenceFailure(int requestId, _PersistenceLoadStatus status) {
     if (!mounted || requestId != _persistenceRequestId) return;
     setState(() {
       _persistedTaxonomy = null;
@@ -218,9 +211,7 @@ class _StageProfileTaxonomySelectionScreenState
     _persistenceStatus = _PersistenceLoadStatus.ready;
   }
 
-  bool _containsAllPersistedIds(
-    StageProfileTaxonomyPersistenceResult result,
-  ) {
+  bool _containsAllPersistedIds(StageProfileTaxonomyPersistenceResult result) {
     final activeGenreIds = _genres.map((genre) => genre.id).toSet();
     final activeRoleIds = _roles.map((role) => role.id).toSet();
     return result.genreIds.every(activeGenreIds.contains) &&
@@ -229,9 +220,7 @@ class _StageProfileTaxonomySelectionScreenState
             activeRoleIds.contains(result.primaryRoleId));
   }
 
-  void _applyAuthoritativeResult(
-    StageProfileTaxonomyPersistenceResult result,
-  ) {
+  void _applyAuthoritativeResult(StageProfileTaxonomyPersistenceResult result) {
     _preferredGenreOrder = List.unmodifiable(result.genreIds);
     _preferredRoleOrder = List.unmodifiable(result.roleIds);
     _selection = result.hasSavedTaxonomy
@@ -266,7 +255,7 @@ class _StageProfileTaxonomySelectionScreenState
     });
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     final validation = _selection.validate();
     setState(() => _validation = validation);
     if (!validation.isValid) return;
@@ -275,8 +264,8 @@ class _StageProfileTaxonomySelectionScreenState
       orderedGenreIds: _orderedSelectedGenreIds,
       orderedRoleIds: _orderedSelectedRoleIds,
     );
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => StageProfileTaxonomySummaryScreen(
           draft: draft,
           genres: _genres,
@@ -285,6 +274,7 @@ class _StageProfileTaxonomySelectionScreenState
         ),
       ),
     );
+    if (saved == true && mounted) Navigator.of(context).pop(true);
   }
 
   Future<StageProfileTaxonomyDraft> _saveTaxonomy(
@@ -358,161 +348,167 @@ class _StageProfileTaxonomySelectionScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('プロフィール設定')),
-      body: SafeArea(
-        bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontal = StageDesignTokens.horizontalPadding(
-              constraints.maxWidth,
-            );
-            return SingleChildScrollView(
-              key: const ValueKey('profile-taxonomy-scroll'),
-              padding: EdgeInsets.fromLTRB(horizontal, 12, horizontal, 32),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 680),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_persistenceNotice != null) ...[
-                        _persistenceNotice!,
-                        const SizedBox(height: StageDesignTokens.space16),
-                      ],
-                      Text(
-                        '活動したいジャンルと役割を選んでください',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: StageDesignTokens.space8),
-                      Text(
-                        '複数選択できます。内容はまだ保存されません。',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: StageDesignTokens.textSecondary,
+    return StageMobilePageFrame(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('プロフィール設定')),
+        body: SafeArea(
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontal = StageDesignTokens.horizontalPadding(
+                constraints.maxWidth,
+              );
+              return SingleChildScrollView(
+                key: const ValueKey('profile-taxonomy-scroll'),
+                padding: EdgeInsets.fromLTRB(horizontal, 12, horizontal, 32),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: StageDesignTokens.maxContentWidth,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_persistenceNotice != null) ...[
+                          _persistenceNotice!,
+                          const SizedBox(height: StageDesignTokens.space16),
+                        ],
+                        Text(
+                          '活動したいジャンルと役割を選んでください',
+                          style: Theme.of(context).textTheme.headlineSmall,
                         ),
-                      ),
-                      const SizedBox(height: StageDesignTokens.space24),
-                      _SelectionSection(
-                        title: 'ダンスジャンル',
-                        description: '活動したいジャンルを1つ以上選択してください',
-                        status: _genreStatus,
-                        emptyMessage: '選択できるダンスジャンルがありません',
-                        authenticationMessage: null,
-                        retryKey: const ValueKey('profile-genre-retry'),
-                        onRetry: _loadGenres,
-                        validationMessage: _validation.genreMessage,
-                        content: Wrap(
-                          spacing: StageDesignTokens.space8,
-                          runSpacing: StageDesignTokens.space8,
-                          children: [
-                            for (final genre in _genres)
-                              FilterChip(
-                                key: ValueKey('genre-${genre.id}'),
-                                label: Text(genre.name),
-                                selected: _selection.selectedGenreIds.contains(
-                                  genre.id,
-                                ),
-                                onSelected: _requiredDataAvailable
-                                    ? (_) => _toggleGenre(genre.id)
-                                    : null,
-                                showCheckmark: true,
-                                selectedColor: StageDesignTokens.surfaceMuted,
-                                checkmarkColor: StageDesignTokens.purple,
-                                side: BorderSide(
-                                  color:
-                                      _selection.selectedGenreIds.contains(
-                                        genre.id,
-                                      )
-                                      ? StageDesignTokens.purple
-                                      : StageDesignTokens.border,
-                                ),
+                        const SizedBox(height: StageDesignTokens.space8),
+                        Text(
+                          '複数選択できます。内容はまだ保存されません。',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: StageDesignTokens.textSecondary,
                               ),
-                          ],
                         ),
-                      ),
-                      const SizedBox(height: StageDesignTokens.space16),
-                      _SelectionSection(
-                        title: '役割',
-                        description: '担当したい役割を1つ以上選択してください',
-                        status: _roleStatus,
-                        emptyMessage: '選択できる役割がありません',
-                        authenticationMessage: '役割を選択するにはログインが必要です',
-                        retryKey: const ValueKey('profile-role-retry'),
-                        onRetry: _loadRoles,
-                        validationMessage: _validation.roleMessage,
-                        content: Wrap(
-                          spacing: StageDesignTokens.space8,
-                          runSpacing: StageDesignTokens.space8,
-                          children: [
-                            for (final role in _roles)
-                              FilterChip(
-                                key: ValueKey('role-${role.id}'),
-                                label: Text(role.name),
-                                selected: _selection.selectedRoleIds.contains(
-                                  role.id,
+                        const SizedBox(height: StageDesignTokens.space24),
+                        _SelectionSection(
+                          title: 'ダンスジャンル',
+                          description: '活動したいジャンルを1つ以上選択してください',
+                          status: _genreStatus,
+                          emptyMessage: '選択できるダンスジャンルがありません',
+                          authenticationMessage: null,
+                          retryKey: const ValueKey('profile-genre-retry'),
+                          onRetry: _loadGenres,
+                          validationMessage: _validation.genreMessage,
+                          content: Wrap(
+                            spacing: StageDesignTokens.space8,
+                            runSpacing: StageDesignTokens.space8,
+                            children: [
+                              for (final genre in _genres)
+                                FilterChip(
+                                  key: ValueKey('genre-${genre.id}'),
+                                  label: Text(genre.name),
+                                  selected: _selection.selectedGenreIds
+                                      .contains(genre.id),
+                                  onSelected: _requiredDataAvailable
+                                      ? (_) => _toggleGenre(genre.id)
+                                      : null,
+                                  showCheckmark: true,
+                                  selectedColor: StageDesignTokens.surfaceMuted,
+                                  checkmarkColor: StageDesignTokens.purple,
+                                  side: BorderSide(
+                                    color:
+                                        _selection.selectedGenreIds.contains(
+                                          genre.id,
+                                        )
+                                        ? StageDesignTokens.purple
+                                        : StageDesignTokens.border,
+                                  ),
                                 ),
-                                onSelected: _requiredDataAvailable
-                                    ? (_) => _toggleRole(role.id)
-                                    : null,
-                                showCheckmark: true,
-                                selectedColor: StageDesignTokens.surfaceMuted,
-                                checkmarkColor: StageDesignTokens.purple,
-                                side: BorderSide(
-                                  color:
-                                      _selection.selectedRoleIds.contains(
-                                        role.id,
-                                      )
-                                      ? StageDesignTokens.purple
-                                      : StageDesignTokens.border,
-                                ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      if (_selection.selectedRoleIds.isNotEmpty) ...[
                         const SizedBox(height: StageDesignTokens.space16),
-                        _PrimaryRoleSection(
-                          roles: _roles
-                              .where(
-                                (role) => _selection.selectedRoleIds.contains(
-                                  role.id,
+                        _SelectionSection(
+                          title: '役割',
+                          description: '担当したい役割を1つ以上選択してください',
+                          status: _roleStatus,
+                          emptyMessage: '選択できる役割がありません',
+                          authenticationMessage: '役割を選択するにはログインが必要です',
+                          retryKey: const ValueKey('profile-role-retry'),
+                          onRetry: _loadRoles,
+                          validationMessage: _validation.roleMessage,
+                          content: Wrap(
+                            spacing: StageDesignTokens.space8,
+                            runSpacing: StageDesignTokens.space8,
+                            children: [
+                              for (final role in _roles)
+                                FilterChip(
+                                  key: ValueKey('role-${role.id}'),
+                                  label: Text(role.name),
+                                  selected: _selection.selectedRoleIds.contains(
+                                    role.id,
+                                  ),
+                                  onSelected: _requiredDataAvailable
+                                      ? (_) => _toggleRole(role.id)
+                                      : null,
+                                  showCheckmark: true,
+                                  selectedColor: StageDesignTokens.surfaceMuted,
+                                  checkmarkColor: StageDesignTokens.purple,
+                                  side: BorderSide(
+                                    color:
+                                        _selection.selectedRoleIds.contains(
+                                          role.id,
+                                        )
+                                        ? StageDesignTokens.purple
+                                        : StageDesignTokens.border,
+                                  ),
                                 ),
-                              )
-                              .toList(growable: false),
-                          primaryRoleId: _selection.primaryRoleId,
-                          validationMessage: _validation.primaryRoleMessage,
-                          onSelected: _requiredDataAvailable
-                              ? _choosePrimaryRole
-                              : (_) {},
+                            ],
+                          ),
                         ),
+                        if (_selection.selectedRoleIds.isNotEmpty) ...[
+                          const SizedBox(height: StageDesignTokens.space16),
+                          _PrimaryRoleSection(
+                            roles: _roles
+                                .where(
+                                  (role) => _selection.selectedRoleIds.contains(
+                                    role.id,
+                                  ),
+                                )
+                                .toList(growable: false),
+                            primaryRoleId: _selection.primaryRoleId,
+                            validationMessage: _validation.primaryRoleMessage,
+                            onSelected: _requiredDataAvailable
+                                ? _choosePrimaryRole
+                                : (_) {},
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        key: const ValueKey('profile-taxonomy-action-bar'),
-        top: false,
-        child: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: StageDesignTokens.surface,
-            border: Border(top: BorderSide(color: StageDesignTokens.border)),
+              );
+            },
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Center(
-              heightFactor: 1,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680),
-                child: StagePrimaryButton(
-                  key: const ValueKey('profile-taxonomy-continue'),
-                  label: '次へ',
-                  icon: Icons.arrow_forward,
-                  onPressed: _requiredDataAvailable ? _continue : null,
+        ),
+        bottomNavigationBar: SafeArea(
+          key: const ValueKey('profile-taxonomy-action-bar'),
+          top: false,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              color: StageDesignTokens.surface,
+              border: Border(top: BorderSide(color: StageDesignTokens.border)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Center(
+                heightFactor: 1,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: StageDesignTokens.maxContentWidth,
+                  ),
+                  child: StagePrimaryButton(
+                    key: const ValueKey('profile-taxonomy-continue'),
+                    label: '次へ',
+                    icon: Icons.arrow_forward,
+                    onPressed: _requiredDataAvailable ? _continue : null,
+                  ),
                 ),
               ),
             ),
@@ -525,19 +521,19 @@ class _StageProfileTaxonomySelectionScreenState
   Widget? get _persistenceNotice {
     return switch (_persistenceStatus) {
       _PersistenceLoadStatus.loading => const StageCard(
-          key: ValueKey('profile-taxonomy-persistence-loading'),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.5),
-              ),
-              SizedBox(width: StageDesignTokens.space12),
-              Expanded(child: Text('保存済みの選択内容を読み込んでいます…')),
-            ],
-          ),
+        key: ValueKey('profile-taxonomy-persistence-loading'),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            SizedBox(width: StageDesignTokens.space12),
+            Expanded(child: Text('保存済みの選択内容を読み込んでいます…')),
+          ],
         ),
+      ),
       _PersistenceLoadStatus.loaded || _PersistenceLoadStatus.ready => null,
       _PersistenceLoadStatus.authenticationRequired => _PersistenceErrorCard(
         message: 'プロフィールを読み込むにはログインが必要です。',
@@ -582,10 +578,7 @@ enum _PersistenceLoadStatus {
 }
 
 class _PersistenceErrorCard extends StatelessWidget {
-  const _PersistenceErrorCard({
-    required this.message,
-    required this.onRetry,
-  });
+  const _PersistenceErrorCard({required this.message, required this.onRetry});
 
   final String message;
   final Future<void> Function({bool showLoading}) onRetry;

@@ -8,9 +8,7 @@ import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 
 typedef StageProfileTaxonomySaveCallback =
-    Future<StageProfileTaxonomyDraft> Function(
-      StageProfileTaxonomyDraft draft,
-    );
+    Future<StageProfileTaxonomyDraft> Function(StageProfileTaxonomyDraft draft);
 
 class StageProfileTaxonomySummaryScreen extends StatefulWidget {
   const StageProfileTaxonomySummaryScreen({
@@ -67,21 +65,13 @@ class _StageProfileTaxonomySummaryScreenState
     ) {
       _showSafeError(error.userMessage, error, stackTrace);
     } catch (error, stackTrace) {
-      _showSafeError(
-        'プロフィールを保存できませんでした。時間をおいて再度お試しください。',
-        error,
-        stackTrace,
-      );
+      _showSafeError('プロフィールを保存できませんでした。時間をおいて再度お試しください。', error, stackTrace);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  void _showSafeError(
-    String message,
-    Object error,
-    StackTrace stackTrace,
-  ) {
+  void _showSafeError(String message, Object error, StackTrace stackTrace) {
     debugPrint('STAGE profile taxonomy save failed: $error\n$stackTrace');
     if (!mounted) return;
     setState(() => _errorMessage = message);
@@ -101,123 +91,137 @@ class _StageProfileTaxonomySummaryScreenState
         .toList(growable: false);
     final primaryRole = rolesById[_draft.primaryRoleId];
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('選択内容の確認')),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontal = StageDesignTokens.horizontalPadding(
-              constraints.maxWidth,
-            );
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(horizontal, 12, horizontal, 32),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 680),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      StageCard(
-                        gradient: StageDesignTokens.heroGradient,
-                        borderColor: Colors.transparent,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(
-                              Icons.check_circle_outline,
-                              color: Colors.white,
-                              size: 32,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '選択内容を確認してください',
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(color: Colors.white),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _hasSaved
-                                  ? 'プロフィールを保存しました。'
-                                  : '内容を確認して保存してください。',
-                              key: _hasSaved
-                                  ? const ValueKey(
-                                      'taxonomy-summary-save-success',
-                                    )
-                                  : null,
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: Colors.white),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: StageDesignTokens.space16),
-                      _SummarySection(
-                        title: 'ダンスジャンル',
-                        names: selectedGenres
-                            .map((genre) => genre.name)
-                            .toList(growable: false),
-                      ),
-                      const SizedBox(height: StageDesignTokens.space16),
-                      _SummarySection(
-                        title: '役割',
-                        names: selectedRoles
-                            .map((role) => role.name)
-                            .toList(growable: false),
-                      ),
-                      const SizedBox(height: StageDesignTokens.space16),
-                      StageCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'メインの役割',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 10),
-                            StageTag(
-                              primaryRole?.name ?? '未選択',
-                              selected: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: StageDesignTokens.space24),
-                      if (_errorMessage != null) ...[
+    return StageMobilePageFrame(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('選択内容の確認')),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontal = StageDesignTokens.horizontalPadding(
+                constraints.maxWidth,
+              );
+              return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(horizontal, 12, horizontal, 32),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: StageDesignTokens.maxContentWidth,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                         StageCard(
-                          key: const ValueKey('taxonomy-summary-save-error'),
-                          child: Row(
+                          gradient: StageDesignTokens.heroGradient,
+                          borderColor: Colors.transparent,
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(
-                                Icons.error_outline,
-                                color: StageDesignTokens.error,
+                                Icons.check_circle_outline,
+                                color: Colors.white,
+                                size: 32,
                               ),
-                              const SizedBox(width: StageDesignTokens.space8),
-                              Expanded(child: Text(_errorMessage!)),
+                              const SizedBox(height: 12),
+                              Text(
+                                '選択内容を確認してください',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(color: Colors.white),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _hasSaved
+                                    ? 'プロフィールを保存しました。'
+                                    : '内容を確認して保存してください。',
+                                key: _hasSaved
+                                    ? const ValueKey(
+                                        'taxonomy-summary-save-success',
+                                      )
+                                    : null,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: Colors.white),
+                              ),
                             ],
                           ),
                         ),
                         const SizedBox(height: StageDesignTokens.space16),
+                        _SummarySection(
+                          title: 'ダンスジャンル',
+                          names: selectedGenres
+                              .map((genre) => genre.name)
+                              .toList(growable: false),
+                        ),
+                        const SizedBox(height: StageDesignTokens.space16),
+                        _SummarySection(
+                          title: '役割',
+                          names: selectedRoles
+                              .map((role) => role.name)
+                              .toList(growable: false),
+                        ),
+                        const SizedBox(height: StageDesignTokens.space16),
+                        StageCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'メインの役割',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 10),
+                              StageTag(
+                                primaryRole?.name ?? '未選択',
+                                selected: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: StageDesignTokens.space24),
+                        if (_errorMessage != null) ...[
+                          StageCard(
+                            key: const ValueKey('taxonomy-summary-save-error'),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: StageDesignTokens.error,
+                                ),
+                                const SizedBox(width: StageDesignTokens.space8),
+                                Expanded(child: Text(_errorMessage!)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: StageDesignTokens.space16),
+                        ],
+                        StagePrimaryButton(
+                          key: const ValueKey('taxonomy-summary-save'),
+                          label: _hasSaved
+                              ? 'プロフィール編集へ戻る'
+                              : _isSaving
+                              ? '保存しています…'
+                              : '保存する',
+                          icon: _hasSaved
+                              ? Icons.check_rounded
+                              : Icons.save_outlined,
+                          onPressed: _isSaving
+                              ? null
+                              : _hasSaved
+                              ? () => Navigator.of(context).pop(true)
+                              : _save,
+                        ),
+                        const SizedBox(height: StageDesignTokens.space12),
+                        StageOutlinedButton(
+                          key: const ValueKey('taxonomy-summary-back'),
+                          label: '選び直す',
+                          icon: Icons.arrow_back,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
                       ],
-                      StagePrimaryButton(
-                        key: const ValueKey('taxonomy-summary-save'),
-                        label: _isSaving ? '保存しています…' : '保存する',
-                        icon: Icons.save_outlined,
-                        onPressed: _isSaving ? null : _save,
-                      ),
-                      const SizedBox(height: StageDesignTokens.space12),
-                      StageOutlinedButton(
-                        key: const ValueKey('taxonomy-summary-back'),
-                        label: '選び直す',
-                        icon: Icons.arrow_back,
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );

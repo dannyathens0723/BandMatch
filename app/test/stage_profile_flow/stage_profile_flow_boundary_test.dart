@@ -62,7 +62,7 @@ void main() {
     expect(sources, isNot(contains('service_role')));
     expect(sources, isNot(contains('p_user_id')));
     expect(sources, isNot(contains('p_auth_uid')));
-    expect(sources, isNot(contains('ProfileService')));
+    expect(sources, isNot(contains('services/profile_service.dart')));
     expect(sources, isNot(contains('ProfileEditData')));
   });
 

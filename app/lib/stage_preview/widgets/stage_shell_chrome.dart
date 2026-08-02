@@ -12,11 +12,13 @@ class StageAppHeader extends StatelessWidget {
     super.key,
     this.isHome = false,
     this.onLogoTap,
+    this.showNotificationBadge = true,
   });
 
   final String title;
   final bool isHome;
   final VoidCallback? onLogoTap;
+  final bool showNotificationBadge;
   final VoidCallback onNotifications;
   final VoidCallback onMessages;
 
@@ -69,6 +71,7 @@ class StageAppHeader extends StatelessWidget {
             child: Align(alignment: Alignment.centerLeft, child: titleWidget),
           ),
           StageNotificationBadge(
+            show: showNotificationBadge,
             child: IconButton(
               key: const ValueKey('stage-notification-action'),
               tooltip: '通知',

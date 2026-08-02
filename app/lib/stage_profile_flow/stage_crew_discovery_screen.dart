@@ -16,6 +16,22 @@ import 'stage_my_crew_overview.dart';
 typedef StageCrewDetailBuilder =
     Widget Function(BuildContext context, StageCrewRecruitment recruitment);
 
+class StageCrewDiscoveryController extends ChangeNotifier {
+  bool get showingMyCrew => _showingMyCrew;
+
+  bool _showingMyCrew = false;
+
+  void showDiscovery() => _setShowingMyCrew(false);
+
+  void showMyCrew() => _setShowingMyCrew(true);
+
+  void _setShowingMyCrew(bool value) {
+    if (_showingMyCrew == value) return;
+    _showingMyCrew = value;
+    notifyListeners();
+  }
+}
+
 class StageCrewDiscoveryScreen extends StatefulWidget {
   const StageCrewDiscoveryScreen({
     super.key,
@@ -25,6 +41,7 @@ class StageCrewDiscoveryScreen extends StatefulWidget {
     this.myCrewDetailBuilder,
     this.applicationDetailBuilder,
     this.managementRepository,
+    this.controller,
   });
 
   final StageCrewDiscoveryRepository? repository;
@@ -33,6 +50,7 @@ class StageCrewDiscoveryScreen extends StatefulWidget {
   final StageMyCrewDetailBuilder? myCrewDetailBuilder;
   final StageMyCrewApplicationDetailBuilder? applicationDetailBuilder;
   final StageCrewManagementRepository? managementRepository;
+  final StageCrewDiscoveryController? controller;
 
   @override
   State<StageCrewDiscoveryScreen> createState() =>
@@ -54,10 +72,23 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
     super.initState();
     _repository = widget.repository ?? StageCrewDiscoveryService();
     _recruitments = _repository.fetchOpenRecruitments();
+    _showingMyCrew = widget.controller?.showingMyCrew ?? false;
+    if (_showingMyCrew) _myCrewOverview = _loadMyCrewOverview();
+    widget.controller?.addListener(_syncController);
+  }
+
+  @override
+  void didUpdateWidget(covariant StageCrewDiscoveryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller == widget.controller) return;
+    oldWidget.controller?.removeListener(_syncController);
+    widget.controller?.addListener(_syncController);
+    _syncController();
   }
 
   @override
   void dispose() {
+    widget.controller?.removeListener(_syncController);
     _searchController.dispose();
     super.dispose();
   }
@@ -173,15 +204,34 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
   }
 
   void _showDiscovery() {
-    setState(() => _showingMyCrew = false);
+    final controller = widget.controller;
+    if (controller != null) {
+      controller.showDiscovery();
+      return;
+    }
+    _applyShowingMyCrew(false);
   }
 
   void _showMyCrew() {
-    if (_showingMyCrew) return;
-    final overview = _loadMyCrewOverview();
+    final controller = widget.controller;
+    if (controller != null) {
+      controller.showMyCrew();
+      return;
+    }
+    _applyShowingMyCrew(true);
+  }
+
+  void _syncController() {
+    if (!mounted) return;
+    _applyShowingMyCrew(widget.controller?.showingMyCrew ?? false);
+  }
+
+  void _applyShowingMyCrew(bool value) {
+    if (_showingMyCrew == value) return;
+    final overview = value ? _loadMyCrewOverview() : null;
     setState(() {
-      _showingMyCrew = true;
-      _myCrewOverview = overview;
+      _showingMyCrew = value;
+      if (overview != null) _myCrewOverview = overview;
     });
   }
 
