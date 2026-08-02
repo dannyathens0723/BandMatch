@@ -29,9 +29,14 @@ class BandMatchApp extends StatelessWidget {
 }
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key, this.authenticatedHomeBuilder});
+  const AuthGate({
+    super.key,
+    this.authenticatedHomeBuilder,
+    this.authPresentation = AuthScreenPresentation.bandMatch,
+  });
 
   final WidgetBuilder? authenticatedHomeBuilder;
+  final AuthScreenPresentation authPresentation;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -146,7 +151,10 @@ class _AuthGateState extends State<AuthGate> {
   @override
   Widget build(BuildContext context) {
     return switch (_state) {
-      _GateState.auth => AuthScreen(initialMessage: _authMessage),
+      _GateState.auth => AuthScreen(
+        initialMessage: _authMessage,
+        presentation: widget.authPresentation,
+      ),
       _GateState.profileSetup => ProfileSetupScreen(
         authUser: _user!,
         onSaved: _resolveCurrentUser,

@@ -1,0 +1,394 @@
+import 'package:flutter/material.dart';
+
+import '../models/stage_crew_recruitment.dart';
+import '../services/stage_crew_discovery_service.dart';
+import '../stage_preview/theme/stage_design_tokens.dart';
+import '../stage_preview/widgets/stage_common.dart';
+import 'stage_crew_detail_screen.dart';
+
+typedef StageCrewDetailBuilder = Widget Function(
+  BuildContext context,
+  StageCrewRecruitment recruitment,
+);
+
+class StageCrewDiscoveryScreen extends StatefulWidget {
+  const StageCrewDiscoveryScreen({
+    super.key,
+    this.repository,
+    this.detailBuilder,
+  });
+
+  final StageCrewDiscoveryRepository? repository;
+  final StageCrewDetailBuilder? detailBuilder;
+
+  @override
+  State<StageCrewDiscoveryScreen> createState() =>
+      _StageCrewDiscoveryScreenState();
+}
+
+class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
+  final _searchController = TextEditingController();
+  late final StageCrewDiscoveryRepository _repository;
+  late Future<List<StageCrewRecruitment>> _recruitments;
+  String? _selectedGenre;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = widget.repository ?? StageCrewDiscoveryService();
+    _recruitments = _repository.fetchOpenRecruitments();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StagePageContent(
+      key: const PageStorageKey('stage-auth-crew'),
+      children: [
+        _DiscoverySegments(onMyCrew: _showMyCrewNotice),
+        const SizedBox(height: StageDesignTokens.space16),
+        TextField(
+          key: const ValueKey('stage-crew-search-field'),
+          controller: _searchController,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            hintText: 'ジャンル・エリア・クルー名で検索',
+            prefixIcon: Icon(Icons.search_rounded),
+            filled: true,
+            fillColor: StageDesignTokens.surface,
+          ),
+        ),
+        const SizedBox(height: StageDesignTokens.space16),
+        FutureBuilder<List<StageCrewRecruitment>>(
+          future: _recruitments,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const _CrewLoadingState();
+            }
+            if (snapshot.hasError) {
+              return _CrewErrorState(onRetry: _retry);
+            }
+
+            final recruitments = snapshot.data ?? const [];
+            if (recruitments.isEmpty) {
+              return const _CrewEmptyState();
+            }
+
+            final genres = recruitments
+                .expand((item) => item.danceGenreNames)
+                .toSet()
+                .toList(growable: false)
+              ..sort();
+            final visibleRecruitments = recruitments
+                .where(
+                  (item) => item.matches(
+                    _searchController.text,
+                    _selectedGenre,
+                  ),
+                )
+                .toList(growable: false);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _GenreFilters(
+                  genres: genres,
+                  selectedGenre: _selectedGenre,
+                  onSelected: (genre) {
+                    setState(() => _selectedGenre = genre);
+                  },
+                ),
+                const SizedBox(height: StageDesignTokens.space16),
+                if (visibleRecruitments.isEmpty)
+                  const _FilteredEmptyState()
+                else
+                  ...visibleRecruitments.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: StageDesignTokens.space12,
+                      ),
+                      child: _CrewRecruitmentCard(
+                        recruitment: item,
+                        onTap: () => _openDetail(item),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _retry() {
+    setState(() {
+      _recruitments = _repository.fetchOpenRecruitments();
+    });
+  }
+
+  Future<void> _openDetail(StageCrewRecruitment recruitment) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (context) => widget.detailBuilder?.call(
+              context,
+              recruitment,
+            ) ??
+            StageCrewDetailScreen(recruitment: recruitment),
+      ),
+    );
+  }
+
+  void _showMyCrewNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('マイクルーは次のMVPステップで実装します')),
+    );
+  }
+}
+
+class _DiscoverySegments extends StatelessWidget {
+  const _DiscoverySegments({required this.onMyCrew});
+
+  final VoidCallback onMyCrew;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton(
+            key: const ValueKey('stage-crew-find-segment'),
+            style: FilledButton.styleFrom(
+              backgroundColor: StageDesignTokens.charcoal,
+            ),
+            onPressed: () {},
+            child: const Text('さがす'),
+          ),
+        ),
+        const SizedBox(width: StageDesignTokens.space8),
+        Expanded(
+          child: OutlinedButton(
+            key: const ValueKey('stage-crew-mine-segment'),
+            onPressed: onMyCrew,
+            child: const Text('マイクルー'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GenreFilters extends StatelessWidget {
+  const _GenreFilters({
+    required this.genres,
+    required this.selectedGenre,
+    required this.onSelected,
+  });
+
+  final List<String> genres;
+  final String? selectedGenre;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          ChoiceChip(
+            label: const Text('すべて'),
+            selected: selectedGenre == null,
+            onSelected: (_) => onSelected(null),
+          ),
+          for (final genre in genres) ...[
+            const SizedBox(width: StageDesignTokens.space8),
+            ChoiceChip(
+              label: Text(genre),
+              selected: selectedGenre == genre,
+              onSelected: (_) => onSelected(genre),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CrewRecruitmentCard extends StatelessWidget {
+  const _CrewRecruitmentCard({
+    required this.recruitment,
+    required this.onTap,
+  });
+
+  final StageCrewRecruitment recruitment;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: ValueKey('stage-crew-card-${recruitment.postId}'),
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(StageDesignTokens.space16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const StageTag(
+                '募集中',
+                color: StageDesignTokens.pink,
+                foregroundColor: Colors.white,
+              ),
+              const SizedBox(height: StageDesignTokens.space8),
+              Text(
+                recruitment.title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: StageDesignTokens.space8),
+              Text(
+                recruitment.crewName,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: StageDesignTokens.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: StageDesignTokens.space12),
+              _MetadataWrap(
+                genres: recruitment.danceGenreNames,
+                areas: recruitment.areaNames,
+              ),
+              const SizedBox(height: StageDesignTokens.space12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: const [
+                  Text(
+                    '詳細を見る',
+                    style: TextStyle(
+                      color: StageDesignTokens.purple,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(width: StageDesignTokens.space4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: StageDesignTokens.purple,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetadataWrap extends StatelessWidget {
+  const _MetadataWrap({required this.genres, required this.areas});
+
+  final List<String> genres;
+  final List<String> areas;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: StageDesignTokens.space8,
+      runSpacing: StageDesignTokens.space8,
+      children: [
+        ...genres.map((genre) => StageTag(genre)),
+        ...areas.map(
+          (area) => StageTag(
+            area,
+            color: StageDesignTokens.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CrewLoadingState extends StatelessWidget {
+  const _CrewLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      key: ValueKey('stage-crew-loading'),
+      padding: EdgeInsets.symmetric(vertical: StageDesignTokens.space32),
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _CrewEmptyState extends StatelessWidget {
+  const _CrewEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const StageEmptyState(
+      key: ValueKey('stage-crew-empty'),
+      icon: Icons.groups_outlined,
+      title: '募集中のクルーはまだありません',
+      message: '新しい募集が公開されると、ここに表示されます',
+    );
+  }
+}
+
+class _FilteredEmptyState extends StatelessWidget {
+  const _FilteredEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const StageEmptyState(
+      key: ValueKey('stage-crew-filter-empty'),
+      icon: Icons.search_off_rounded,
+      title: '条件に合う募集がありません',
+      message: '検索語やジャンルを変えてお試しください',
+    );
+  }
+}
+
+class _CrewErrorState extends StatelessWidget {
+  const _CrewErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return StageCard(
+      key: const ValueKey('stage-crew-error'),
+      color: StageDesignTokens.surfaceMuted,
+      borderColor: StageDesignTokens.surfaceMuted,
+      child: Column(
+        children: [
+          const Icon(
+            Icons.cloud_off_outlined,
+            color: StageDesignTokens.error,
+            size: 32,
+          ),
+          const SizedBox(height: StageDesignTokens.space8),
+          Text(
+            'クルー募集を読み込めませんでした',
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: StageDesignTokens.space4),
+          const Text('時間をおいて再度お試しください'),
+          const SizedBox(height: StageDesignTokens.space12),
+          OutlinedButton(
+            key: const ValueKey('stage-crew-retry'),
+            onPressed: onRetry,
+            child: const Text('再試行'),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -82,11 +82,13 @@ void main() {
     ).readAsStringSync();
 
     expect(stageProfileAppSource, contains('AuthGate'));
+    expect(stageProfileAppSource, contains('AuthScreenPresentation.stage'));
     expect(stageProfileAppSource, contains('authenticatedHomeBuilder'));
     expect(stageProfileAppSource, contains('StageAuthenticatedShell'));
     expect(appSource, contains('widget.authenticatedHomeBuilder'));
     expect(appSource, contains('const HomeScreen()'));
     expect(shellSource, contains('StageAuthenticatedMyPageScreen'));
+    expect(shellSource, contains('StageCrewDiscoveryScreen'));
     expect(shellSource, isNot(contains('const HomeScreen(')));
     expect(shellSource, isNot(contains('BandMatch')));
     expect(shellSource, isNot(contains('MemberListScreen')));
@@ -102,6 +104,7 @@ void main() {
     final appSource = File('lib/app.dart').readAsStringSync();
 
     expect(appSource, contains('const AuthGate()'));
+    expect(appSource, contains('AuthScreenPresentation.bandMatch'));
     expect(appSource, contains('const HomeScreen()'));
     expect(appSource, contains('widget.authenticatedHomeBuilder'));
   });

@@ -129,10 +129,24 @@ class StageBottomNavigation extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        selected ? tab.selectedIcon : tab.icon,
-                        size: 22,
-                        color: color,
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        width: 32,
+                        height: 27,
+                        decoration: BoxDecoration(
+                          color: tab == StageTab.home && selected
+                              ? StageDesignTokens.surfaceMuted
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(
+                            StageDesignTokens.radiusPill,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          selected ? tab.selectedIcon : tab.icon,
+                          size: tab == StageTab.home ? 24 : 22,
+                          color: color,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       FittedBox(

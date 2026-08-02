@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../config/app_config.dart';
+import '../screens/auth_screen.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import 'stage_authenticated_shell.dart';
 
@@ -16,8 +17,8 @@ class StageProfileFlowApp extends StatelessWidget {
       theme: StageDesignTokens.theme,
       home: AppConfig.isSupabaseConfigured
           ? AuthGate(
-              authenticatedHomeBuilder: (_) =>
-                  const StageAuthenticatedShell(),
+              authPresentation: AuthScreenPresentation.stage,
+              authenticatedHomeBuilder: (_) => const StageAuthenticatedShell(),
             )
           : const SupabaseConfigurationScreen(),
     );

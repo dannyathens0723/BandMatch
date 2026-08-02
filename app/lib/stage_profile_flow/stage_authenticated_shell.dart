@@ -6,10 +6,16 @@ import '../stage_preview/widgets/stage_common.dart';
 import '../stage_preview/widgets/stage_shell_chrome.dart';
 import 'stage_authenticated_home_screen.dart';
 import 'stage_authenticated_my_page_screen.dart';
+import 'stage_crew_discovery_screen.dart';
 
 class StageAuthenticatedShell extends StatefulWidget {
-  const StageAuthenticatedShell({super.key, this.myPageBuilder});
+  const StageAuthenticatedShell({
+    super.key,
+    this.crewBuilder,
+    this.myPageBuilder,
+  });
 
+  final WidgetBuilder? crewBuilder;
   final WidgetBuilder? myPageBuilder;
 
   @override
@@ -19,14 +25,15 @@ class StageAuthenticatedShell extends StatefulWidget {
 
 class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
   static const _navigationOrder = [
-    StageTab.home,
     StageTab.crew,
     StageTab.stage,
+    StageTab.home,
     StageTab.studio,
     StageTab.myPage,
   ];
 
   StageTab _currentTab = StageTab.home;
+  final Set<StageTab> _visitedTabs = {StageTab.home};
 
   @override
   Widget build(BuildContext context) {
@@ -60,31 +67,9 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
                     Expanded(
                       child: IndexedStack(
                         index: _navigationOrder.indexOf(_currentTab),
-                        children: [
-                          StageAuthenticatedHomeScreen(
-                            onSelectTab: _selectTab,
-                          ),
-                          const StageMvpAreaScreen(
-                            key: PageStorageKey('stage-auth-crew'),
-                            icon: Icons.groups_outlined,
-                            title: 'クルー',
-                            description: '仲間を探し、参加中のクルーを管理する場所です。',
-                          ),
-                          const StageMvpAreaScreen(
-                            key: PageStorageKey('stage-auth-stage'),
-                            icon: Icons.mic_none_outlined,
-                            title: 'ステージ',
-                            description: 'イベントやレッスンの情報を探す場所です。',
-                          ),
-                          const StageMvpAreaScreen(
-                            key: PageStorageKey('stage-auth-studio'),
-                            icon: Icons.location_on_outlined,
-                            title: 'スタジオ',
-                            description: '練習場所を探し、候補を比較する場所です。',
-                          ),
-                          widget.myPageBuilder?.call(context) ??
-                              const StageAuthenticatedMyPageScreen(),
-                        ],
+                        children: _navigationOrder
+                            .map((tab) => _buildTabBody(context, tab))
+                            .toList(growable: false),
                       ),
                     ),
                     StageBottomNavigation(
@@ -102,18 +87,44 @@ class _StageAuthenticatedShellState extends State<StageAuthenticatedShell> {
     );
   }
 
+  Widget _buildTabBody(BuildContext context, StageTab tab) {
+    return switch (tab) {
+      StageTab.crew =>
+        _visitedTabs.contains(StageTab.crew)
+            ? widget.crewBuilder?.call(context) ??
+                  const StageCrewDiscoveryScreen()
+            : const SizedBox.shrink(),
+      StageTab.stage => const StageMvpAreaScreen(
+        key: PageStorageKey('stage-auth-stage'),
+        icon: Icons.mic_none_outlined,
+        title: 'ステージ',
+        description: 'イベントやレッスンの情報を探す場所です。',
+      ),
+      StageTab.home => StageAuthenticatedHomeScreen(onSelectTab: _selectTab),
+      StageTab.studio => const StageMvpAreaScreen(
+        key: PageStorageKey('stage-auth-studio'),
+        icon: Icons.location_on_outlined,
+        title: 'スタジオ',
+        description: '練習場所を探し、候補を比較する場所です。',
+      ),
+      StageTab.myPage =>
+        widget.myPageBuilder?.call(context) ??
+            const StageAuthenticatedMyPageScreen(),
+    };
+  }
+
   void _selectTab(StageTab tab) {
     if (tab == _currentTab) return;
-    setState(() => _currentTab = tab);
+    setState(() {
+      _visitedTabs.add(tab);
+      _currentTab = tab;
+    });
   }
 
   void _openPlaceholder({required String title, required IconData icon}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => _StageGlobalPlaceholderScreen(
-          title: title,
-          icon: icon,
-        ),
+        builder: (_) => _StageGlobalPlaceholderScreen(title: title, icon: icon),
       ),
     );
   }
