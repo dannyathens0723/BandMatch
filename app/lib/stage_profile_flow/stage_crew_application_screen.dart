@@ -35,71 +35,63 @@ class _StageCrewApplicationScreenState
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: StageDesignTokens.charcoal,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: StageDesignTokens.maxContentWidth,
-          ),
-          child: Scaffold(
-            key: const ValueKey('stage-crew-application-screen'),
-            appBar: AppBar(title: const Text('応募フォーム')),
-            body: ListView(
-              padding: const EdgeInsets.all(StageDesignTokens.space16),
-              children: [
-                StageCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.recruitment.title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: StageDesignTokens.space4),
-                      Text(
-                        widget.recruitment.crewName,
-                        style: const TextStyle(
-                          color: StageDesignTokens.textSecondary,
-                        ),
-                      ),
-                    ],
+    return StageMobilePageFrame(
+      child: Scaffold(
+        key: const ValueKey('stage-crew-application-screen'),
+        appBar: AppBar(title: const Text('応募フォーム')),
+        body: ListView(
+          padding: const EdgeInsets.all(StageDesignTokens.space16),
+          children: [
+            StageCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.recruitment.title,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
-                const SizedBox(height: StageDesignTokens.space16),
-                TextField(
-                  key: const ValueKey('stage-crew-application-message'),
-                  controller: _messageController,
-                  minLines: 5,
-                  maxLines: 8,
-                  maxLength: 500,
-                  onChanged: (_) {
-                    if (_validationMessage != null) {
-                      setState(() => _validationMessage = null);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'メッセージ（任意）',
-                    hintText: '経験や参加したい理由を入力してください',
-                    errorText: _validationMessage,
-                    filled: true,
-                    fillColor: StageDesignTokens.surface,
+                  const SizedBox(height: StageDesignTokens.space4),
+                  Text(
+                    widget.recruitment.crewName,
+                    style: const TextStyle(
+                      color: StageDesignTokens.textSecondary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: StageDesignTokens.space16),
-                FilledButton(
-                  key: const ValueKey('stage-crew-submit-application'),
-                  onPressed: _isSubmitting ? null : _submit,
-                  child: _isSubmitting
-                      ? const SizedBox.square(
-                          dimension: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('応募を送信する'),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: StageDesignTokens.space16),
+            TextField(
+              key: const ValueKey('stage-crew-application-message'),
+              controller: _messageController,
+              minLines: 5,
+              maxLines: 8,
+              maxLength: 500,
+              onChanged: (_) {
+                if (_validationMessage != null) {
+                  setState(() => _validationMessage = null);
+                }
+              },
+              decoration: InputDecoration(
+                labelText: 'メッセージ（任意）',
+                hintText: '経験や参加したい理由を入力してください',
+                errorText: _validationMessage,
+                filled: true,
+                fillColor: StageDesignTokens.surface,
+              ),
+            ),
+            const SizedBox(height: StageDesignTokens.space16),
+            FilledButton(
+              key: const ValueKey('stage-crew-submit-application'),
+              onPressed: _isSubmitting ? null : _submit,
+              child: _isSubmitting
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('応募を送信する'),
+            ),
+          ],
         ),
       ),
     );
@@ -114,8 +106,7 @@ class _StageCrewApplicationScreenState
 
     setState(() => _isSubmitting = true);
     try {
-      final RecruitmentApplicationState result =
-          await widget.submitApplication(
+      final RecruitmentApplicationState result = await widget.submitApplication(
         postId: widget.recruitment.postId,
         message: message,
       );
@@ -131,9 +122,7 @@ class _StageCrewApplicationScreenState
       debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('応募を送信できませんでした。時間をおいて再度お試しください。'),
-        ),
+        const SnackBar(content: Text('応募を送信できませんでした。時間をおいて再度お試しください。')),
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

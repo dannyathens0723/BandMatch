@@ -3,6 +3,30 @@ import 'package:flutter/material.dart';
 import '../models/stage_preview_data.dart';
 import '../theme/stage_design_tokens.dart';
 
+class StageMobilePageFrame extends StatelessWidget {
+  const StageMobilePageFrame({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: StageDesignTokens.charcoal,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: StageDesignTokens.maxContentWidth,
+          ),
+          child: SizedBox.expand(
+            key: const ValueKey('stage-mobile-page-canvas'),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class StagePageContent extends StatelessWidget {
   const StagePageContent({
     required this.children,

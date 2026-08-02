@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import '../models/stage_crew_recruitment.dart';
 import '../models/stage_my_crew.dart';
 import '../services/stage_crew_discovery_service.dart';
+import '../services/stage_crew_management_service.dart';
 import '../services/stage_my_crew_service.dart';
 import '../stage_preview/theme/stage_design_tokens.dart';
 import '../stage_preview/widgets/stage_common.dart';
 import 'stage_crew_detail_screen.dart';
+import 'stage_crew_management_screens.dart';
 import 'stage_my_crew_overview.dart';
 
 typedef StageCrewDetailBuilder =
@@ -22,6 +24,7 @@ class StageCrewDiscoveryScreen extends StatefulWidget {
     this.myCrewRepository,
     this.myCrewDetailBuilder,
     this.applicationDetailBuilder,
+    this.managementRepository,
   });
 
   final StageCrewDiscoveryRepository? repository;
@@ -29,6 +32,7 @@ class StageCrewDiscoveryScreen extends StatefulWidget {
   final StageMyCrewRepository? myCrewRepository;
   final StageMyCrewDetailBuilder? myCrewDetailBuilder;
   final StageMyCrewApplicationDetailBuilder? applicationDetailBuilder;
+  final StageCrewManagementRepository? managementRepository;
 
   @override
   State<StageCrewDiscoveryScreen> createState() =>
@@ -41,6 +45,7 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
   StageMyCrewRepository? _myCrewRepository;
   late Future<List<StageCrewRecruitment>> _recruitments;
   Future<StageMyCrewOverview>? _myCrewOverview;
+  StageCrewManagementRepository? _managementRepository;
   String? _selectedGenre;
   bool _showingMyCrew = false;
 
@@ -145,6 +150,7 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
             onFindCrews: _showDiscovery,
             onOpenCrew: _openMyCrewDetail,
             onOpenApplication: _openApplicationDetail,
+            onCreateCrew: _createCrew,
           ),
       ],
     );
@@ -191,9 +197,37 @@ class _StageCrewDiscoveryScreenState extends State<StageCrewDiscoveryScreen> {
       MaterialPageRoute<void>(
         builder: (context) =>
             widget.myCrewDetailBuilder?.call(context, crew) ??
-            StageMyCrewDetailScreen(crew: crew),
+            (crew.isManaged
+                ? StageManagedCrewScreen(
+                    crew: crew,
+                    repository: _managementRepositoryInstance,
+                  )
+                : StageMyCrewDetailScreen(crew: crew)),
       ),
     );
+    _refreshAll();
+  }
+
+  Future<void> _createCrew() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) =>
+            StageCrewEditorScreen(repository: _managementRepositoryInstance),
+      ),
+    );
+    if (changed == true) _refreshAll();
+  }
+
+  StageCrewManagementRepository get _managementRepositoryInstance =>
+      _managementRepository ??=
+          widget.managementRepository ?? StageCrewManagementService();
+
+  void _refreshAll() {
+    if (!mounted) return;
+    setState(() {
+      _myCrewOverview = _loadMyCrewOverview();
+      _recruitments = _repository.fetchOpenRecruitments();
+    });
   }
 
   Future<void> _openApplicationDetail(

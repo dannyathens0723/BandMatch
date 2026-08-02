@@ -16,6 +16,7 @@ class StageMyCrewOverviewPanel extends StatelessWidget {
     required this.onFindCrews,
     required this.onOpenCrew,
     required this.onOpenApplication,
+    required this.onCreateCrew,
     super.key,
   });
 
@@ -24,6 +25,7 @@ class StageMyCrewOverviewPanel extends StatelessWidget {
   final VoidCallback onFindCrews;
   final ValueChanged<StageMyCrew> onOpenCrew;
   final ValueChanged<StageMyCrewApplication> onOpenApplication;
+  final VoidCallback onCreateCrew;
 
   @override
   Widget build(BuildContext context) {
@@ -39,12 +41,30 @@ class StageMyCrewOverviewPanel extends StatelessWidget {
         }
         if (snapshot.hasError) return _ErrorState(onRetry: onRetry);
         final overview = snapshot.data!;
-        if (overview.isEmpty) {
-          return _EmptyState(onFindCrews: onFindCrews);
-        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Row(
+              children: [
+                Expanded(
+                  child: StagePrimaryButton(
+                    key: const ValueKey('stage-create-crew'),
+                    label: 'クルーを作成',
+                    icon: Icons.add_rounded,
+                    onPressed: onCreateCrew,
+                  ),
+                ),
+                const SizedBox(width: StageDesignTokens.space8),
+                IconButton.filledTonal(
+                  key: const ValueKey('stage-my-crew-refresh'),
+                  tooltip: '最新情報に更新',
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: StageDesignTokens.space16),
+            if (overview.isEmpty) _EmptyState(onFindCrews: onFindCrews),
             if (overview.managedCrews.isNotEmpty)
               _CrewSection(
                 key: const ValueKey('stage-my-crew-managed-section'),
@@ -281,47 +301,49 @@ class StageMyCrewDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: const ValueKey('stage-my-crew-detail-screen'),
-      appBar: AppBar(title: const Text('クルー詳細')),
-      body: ListView(
-        padding: const EdgeInsets.all(StageDesignTokens.space16),
-        children: [
-          StageCard(
-            gradient: StageDesignTokens.heroGradient,
-            borderColor: Colors.transparent,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                StageStatusBadge(label: _roleLabel(crew)),
-                const SizedBox(height: StageDesignTokens.space12),
-                Text(
-                  crew.crewName,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineSmall?.copyWith(color: Colors.white),
-                ),
-              ],
+    return StageMobilePageFrame(
+      child: Scaffold(
+        key: const ValueKey('stage-my-crew-detail-screen'),
+        appBar: AppBar(title: const Text('クルー詳細')),
+        body: ListView(
+          padding: const EdgeInsets.all(StageDesignTokens.space16),
+          children: [
+            StageCard(
+              gradient: StageDesignTokens.heroGradient,
+              borderColor: Colors.transparent,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  StageStatusBadge(label: _roleLabel(crew)),
+                  const SizedBox(height: StageDesignTokens.space12),
+                  Text(
+                    crew.crewName,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.headlineSmall?.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: StageDesignTokens.space16),
-          StageCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(crew.crewBio ?? 'クルー紹介はまだ登録されていません。'),
-                const SizedBox(height: StageDesignTokens.space12),
-                Text('${crew.activeMemberCount}名が参加中'),
-                Text('公開中の募集 ${crew.openRecruitmentCount}件'),
-              ],
+            const SizedBox(height: StageDesignTokens.space16),
+            StageCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(crew.crewBio ?? 'クルー紹介はまだ登録されていません。'),
+                  const SizedBox(height: StageDesignTokens.space12),
+                  Text('${crew.activeMemberCount}名が参加中'),
+                  Text('公開中の募集 ${crew.openRecruitmentCount}件'),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: StageDesignTokens.space16),
-          const StageCard(
-            color: StageDesignTokens.surfaceMuted,
-            child: Text('予定・メンバー管理などのクルー機能は現在準備中です'),
-          ),
-        ],
+            const SizedBox(height: StageDesignTokens.space16),
+            const StageCard(
+              color: StageDesignTokens.surfaceMuted,
+              child: Text('予定・メンバー管理などのクルー機能は現在準備中です'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -337,36 +359,42 @@ class StageMyCrewApplicationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: const ValueKey('stage-my-crew-application-detail-screen'),
-      appBar: AppBar(title: const Text('応募詳細')),
-      body: ListView(
-        padding: const EdgeInsets.all(StageDesignTokens.space16),
-        children: [
-          StageCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                StageStatusBadge(
-                  label: _applicationStatusLabel(application.applicationStatus),
-                  color: _applicationStatusColor(application.applicationStatus),
-                ),
-                const SizedBox(height: StageDesignTokens.space12),
-                Text(
-                  application.title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: StageDesignTokens.space8),
-                Text(application.crewName),
-                const SizedBox(height: StageDesignTokens.space16),
-                Text(application.body),
-                const SizedBox(height: StageDesignTokens.space16),
-                Text('応募日: ${_date(application.appliedAt)}'),
-                Text('募集状態: ${_postStatusLabel(application.postStatus)}'),
-              ],
+    return StageMobilePageFrame(
+      child: Scaffold(
+        key: const ValueKey('stage-my-crew-application-detail-screen'),
+        appBar: AppBar(title: const Text('応募詳細')),
+        body: ListView(
+          padding: const EdgeInsets.all(StageDesignTokens.space16),
+          children: [
+            StageCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  StageStatusBadge(
+                    label: _applicationStatusLabel(
+                      application.applicationStatus,
+                    ),
+                    color: _applicationStatusColor(
+                      application.applicationStatus,
+                    ),
+                  ),
+                  const SizedBox(height: StageDesignTokens.space12),
+                  Text(
+                    application.title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: StageDesignTokens.space8),
+                  Text(application.crewName),
+                  const SizedBox(height: StageDesignTokens.space16),
+                  Text(application.body),
+                  const SizedBox(height: StageDesignTokens.space16),
+                  Text('応募日: ${_date(application.appliedAt)}'),
+                  Text('募集状態: ${_postStatusLabel(application.postStatus)}'),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

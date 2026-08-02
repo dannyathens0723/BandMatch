@@ -206,10 +206,85 @@ void main() {
 
       expect(submittedPostId, _recruitment.postId);
       expect(submittedMessage, '一緒にステージを目指したいです');
-      expect(find.text('応募済み・確認中です'), findsOneWidget);
+      expect(find.text('応募済み・確認中'), findsOneWidget);
       expect(find.text('応募を受け付けました'), findsOneWidget);
     },
   );
+
+  for (final entry in const {
+    'pending': '応募済み・確認中',
+    'accepted': '承認済み',
+    'rejected': '見送り',
+  }.entries) {
+    testWidgets('${entry.key} application cannot reapply', (tester) async {
+      await _setSurface(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: StageDesignTokens.theme,
+          home: StageCrewDetailScreen(
+            recruitment: _recruitment,
+            loadApplicationState: (_) async => RecruitmentApplicationState(
+              state: entry.key,
+              applicationId: 'application-1',
+            ),
+            submitApplication: ({required postId, required message}) async =>
+                throw StateError('submit must remain unavailable'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(entry.value), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('stage-crew-apply-button')),
+        findsNothing,
+      );
+      if (entry.key == 'rejected') {
+        expect(find.text('この募集には再応募できません'), findsOneWidget);
+      }
+    });
+  }
+
+  testWidgets('a different post from the same Crew remains applicable', (
+    tester,
+  ) async {
+    final otherPost = StageCrewRecruitment(
+      postId: 'post-2',
+      crewId: _recruitment.crewId,
+      crewName: _recruitment.crewName,
+      crewAvatarUrl: null,
+      title: '別の募集',
+      body: '同じクルーの別募集です',
+      createdAt: _recruitment.createdAt,
+      updatedAt: _recruitment.updatedAt,
+      danceGenreNames: _recruitment.danceGenreNames,
+      areaNames: _recruitment.areaNames,
+    );
+    await _setSurface(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: StageDesignTokens.theme,
+        home: StageCrewDetailScreen(
+          recruitment: otherPost,
+          loadApplicationState: (postId) async => RecruitmentApplicationState(
+            state: postId == _recruitment.postId ? 'rejected' : 'none',
+            applicationId: null,
+          ),
+          submitApplication: ({required postId, required message}) async =>
+              const RecruitmentApplicationState(
+                state: 'pending',
+                applicationId: 'application-2',
+              ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('stage-crew-apply-button')),
+      findsOneWidget,
+    );
+  });
 }
 
 final _recruitment = StageCrewRecruitment(

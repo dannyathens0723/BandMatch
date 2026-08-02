@@ -42,11 +42,30 @@ class RecruitmentApplicationService {
   Future<RecruitmentApplicationState> applyToPost({
     required String postId,
     required String message,
+  }) => _applyToPostRpc(
+    'apply_to_recruitment_post',
+    postId: postId,
+    message: message,
+  );
+
+  Future<RecruitmentApplicationState> applyToStagePost({
+    required String postId,
+    required String message,
+  }) => _applyToPostRpc(
+    'apply_to_stage_recruitment_post_v1',
+    postId: postId,
+    message: message,
+  );
+
+  Future<RecruitmentApplicationState> _applyToPostRpc(
+    String rpc, {
+    required String postId,
+    required String message,
   }) async {
     dynamic response;
     try {
       response = await _client.rpc(
-        'apply_to_recruitment_post',
+        rpc,
         params: {'p_post_id': postId, 'p_message': message},
       );
     } on PostgrestException catch (error, stackTrace) {
